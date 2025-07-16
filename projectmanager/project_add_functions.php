@@ -23,7 +23,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_project_equipment
   mysqli_query($con, "INSERT INTO project_add_equipment (project_id, equipment_id, category, days_used, total, depreciation, status, price) VALUES ('$project_id', '$equipment_id', '$category', '$days_used', '$total', '$depreciation', '$status', '$price')");
   // Update equipment table status to 'Pending' and set borrow_time
   mysqli_query($con, "UPDATE equipment SET status = 'Pending', borrow_time = '$now' WHERE id = '$equipment_id'");
-  header("Location: project_details.php?id=$project_id");
+  // --- NOTIFICATION FOR PROCUREMENT ---
+  // Get equipment name
+  $eq_name_res = mysqli_query($con, "SELECT equipment_name FROM equipment WHERE id='$equipment_id' LIMIT 1");
+  $eq_name_row = mysqli_fetch_assoc($eq_name_res);
+  $equipment_name = isset($eq_name_row['equipment_name']) ? $eq_name_row['equipment_name'] : '';
+  $notif_type = 'Request';
+  $message = mysqli_real_escape_string($con, "I'm requesting for the use of this $equipment_name");
+  $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+  $is_read = 0;
+  $created_at = date('Y-m-d H:i:s');
+  mysqli_query($con, "INSERT INTO notifications_procurement (user_id, notif_type, message, is_read, created_at) VALUES ('$user_id', '$notif_type', '$message', '$is_read', '$created_at')");
+  // --- END NOTIFICATION ---
+  header("Location: project_details.php?id=$project_id&addequip=1");
   exit();
 }
 // Add Employee to Project
@@ -38,6 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_project_employee'
     $sql = "INSERT INTO project_add_employee (project_id, employee_id, position, daily_rate, days, schedule, total) VALUES ('$project_id', '$employee_id', '$position', '$daily_rate', '$days', '$schedule', '$total')";
     mysqli_query($con, $sql);
     header("Location: project_details.php?id=$project_id&addemp=1");
+    exit();
+}
+// Remove employee from project (add this block if not present)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove_project_employee'])) {
+    $row_id = intval($_POST['row_id']);
+    $project_id = intval($_GET['id']);
+    mysqli_query($con, "DELETE FROM project_add_employee WHERE id='$row_id'");
+    header("Location: project_details.php?id=$project_id&removeemp=1");
     exit();
 }
 // Add Material to Project

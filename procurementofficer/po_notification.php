@@ -7,7 +7,7 @@ $con = new mysqli("localhost", "root", "", "voltech2");
 $unread_count = 0;
 $notifications = [];
 if ($user_id) {
-    $res = $con->query("SELECT id, notif_type, message, is_read, created_at FROM notifications_procurement WHERE user_id = $user_id ORDER BY created_at DESC LIMIT 10");
+    $res = $con->query("SELECT id, notif_type, message, is_read, created_at FROM notifications_procurement WHERE (user_id = $user_id OR (notif_type LIKE '%Request%' AND notif_type != 'Activation')) ORDER BY created_at DESC LIMIT 10");
     if ($res && $res->num_rows > 0) {
         while ($row = $res->fetch_assoc()) {
             $notifications[] = $row;

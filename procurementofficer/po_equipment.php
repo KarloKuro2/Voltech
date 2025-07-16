@@ -52,6 +52,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
     exit();
 }
 
+// --- Handle Approve/Reject Equipment Request ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_action']) && isset($_POST['pae_id']) && isset($_POST['equipment_id'])) {
+    $pae_id = intval($_POST['pae_id']);
+    $equipment_id = intval($_POST['equipment_id']);
+    if ($_POST['request_action'] === 'approve') {
+        $con->query("UPDATE project_add_equipment SET status='In Use' WHERE id=$pae_id");
+        $con->query("UPDATE equipment SET status='In Use' WHERE id=$equipment_id");
+        // Get project_id from project_add_equipment
+        $proj_id_res = $con->query("SELECT project_id FROM project_add_equipment WHERE id=$pae_id LIMIT 1");
+        $project_id = ($proj_id_res && $proj_id_res->num_rows > 0) ? $proj_id_res->fetch_assoc()['project_id'] : null;
+        $user_id = null;
+        if ($project_id) {
+            // Get user_id from projects table
+            $user_res = $con->query("SELECT user_id FROM projects WHERE project_id='$project_id' LIMIT 1");
+            if ($user_res && $user_res->num_rows > 0) {
+                $user_id = $user_res->fetch_assoc()['user_id'];
+            }
+        }
+        // Get equipment name for message
+        $eq_name = '';
+        $eq_name_res = $con->query("SELECT equipment_name FROM equipment WHERE id=$equipment_id LIMIT 1");
+        if ($eq_name_res && $eq_name_res->num_rows > 0) {
+            $eq_name = $eq_name_res->fetch_assoc()['equipment_name'];
+        }
+        if ($user_id && $eq_name) {
+            $notif_type = 'New added equipment';
+            $notif_msg = "A new equipment ($eq_name) has been approved and added to your project.";
+            $con->query("INSERT INTO notifications_projectmanager (user_id, notif_type, message, is_read, created_at) VALUES ('$user_id', '$notif_type', '$notif_msg', 0, NOW())");
+        }
+        header('Location: po_equipment.php?approved=1');
+        exit();
+    } elseif ($_POST['request_action'] === 'reject') {
+        $con->query("UPDATE project_add_equipment SET status='Rejected' WHERE id=$pae_id");
+        $con->query("UPDATE equipment SET status='Available' WHERE id=$equipment_id");
+        // Get project_id from project_add_equipment
+        $proj_id_res = $con->query("SELECT project_id FROM project_add_equipment WHERE id=$pae_id LIMIT 1");
+        $project_id = ($proj_id_res && $proj_id_res->num_rows > 0) ? $proj_id_res->fetch_assoc()['project_id'] : null;
+        $user_id = null;
+        if ($project_id) {
+            // Get user_id from projects table
+            $user_res = $con->query("SELECT user_id FROM projects WHERE project_id='$project_id' LIMIT 1");
+            if ($user_res && $user_res->num_rows > 0) {
+                $user_id = $user_res->fetch_assoc()['user_id'];
+            }
+        }
+        // Get equipment name for message
+        $eq_name = '';
+        $eq_name_res = $con->query("SELECT equipment_name FROM equipment WHERE id=$equipment_id LIMIT 1");
+        if ($eq_name_res && $eq_name_res->num_rows > 0) {
+            $eq_name = $eq_name_res->fetch_assoc()['equipment_name'];
+        }
+        if ($user_id && $eq_name) {
+            $notif_type = 'New added equipment';
+            $notif_msg = "A new equipment ($eq_name) request has been rejected for your project.";
+            $con->query("INSERT INTO notifications_projectmanager (user_id, notif_type, message, is_read, created_at) VALUES ('$user_id', '$notif_type', '$notif_msg', 0, NOW())");
+        }
+        header('Location: po_equipment.php?rejected=1');
+        exit();
+    }
+}
+// --- Fetch Pending Equipment Requests from project_add_equipment ---
+$pending_requests = [];
+$pending_query = $con->query("SELECT pae.id as pae_id, pae.equipment_id, e.equipment_name FROM project_add_equipment pae LEFT JOIN equipment e ON pae.equipment_id = e.id WHERE pae.status = 'Pending' ORDER BY pae.id DESC");
+while ($row = $pending_query && $pending_query->num_rows > 0 ? $pending_query->fetch_assoc() : false) {
+    $pending_requests[] = $row;
+}
+
 
 // Handle add equipment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['equipment_id'])) {
@@ -187,6 +254,16 @@ $result = $con->query($sql);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
     <link rel="stylesheet" href="po_styles.css" />
     <title>Procurement Officer Equipments</title>
+    <style>
+    .nav-tabs .nav-link.active {
+        background-color: #28a745 !important;
+        color: #fff !important;
+        border-color: #28a745 #28a745 #fff !important;
+    }
+    .nav-tabs .nav-link {
+        color: #28a745;
+    }
+    </style>
 </head>
 
 <body>
@@ -263,125 +340,177 @@ $result = $con->query($sql);
             </nav>
 
             <div class="container-fluid px-4 py-4">
-                <!-- Equipment Summary Cards -->
-                
-                <!-- End Equipment Summary Cards -->
-                <div class="card mb-5 shadow rounded-3">
-                    <div class="card-body">
-                        <div class="mb-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
-                            <h4 class="mb-0">Equipment List</h4>
-                            <button type="button" class="btn btn-success ms-auto" data-bs-toggle="modal" data-bs-target="#addEquipmentModal">
-                                <i class="fas fa-plus"></i> Add New Equipment
-                            </button>
-                            <a href="#" class="btn btn-danger ms-2 exportPdfBtn">
-                                <i class="fas fa-file-pdf"></i> Export as PDF
-                            </a>
-                        </div>
-                        <hr>
-                        <form class="d-flex flex-wrap gap-2 mb-3" method="get" action="" id="searchForm" style="min-width:260px; max-width:600px;">
-                            <div class="input-group" style="min-width:220px; max-width:320px;">
-                                <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                                <input type="text" class="form-control border-start-0" name="search" placeholder="Search equipment name or purpose" value="<?php echo htmlspecialchars($search); ?>" id="searchInput" autocomplete="off">
-                                </div>
-                            <select name="status" class="form-control" style="max-width:180px;" id="statusFilter">
-                                        <option value="">All Status</option>
-                                        <?php 
-                                        $statuses->data_seek(0); // Reset the pointer
-                                        while ($status = $statuses->fetch_assoc()): ?>
-                                    <option value="<?php echo htmlspecialchars($status['status']); ?>" <?php echo ($status_filter == $status['status']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($status['status']); ?></option>
-                                        <?php endwhile; ?>
-                                    </select>
-                        </form>
-                        <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            var searchInput = document.getElementById('searchInput');
-                            var statusFilter = document.getElementById('statusFilter');
-                            var searchForm = document.getElementById('searchForm');
-                            if (searchInput && searchForm) {
-                                var searchTimeout;
-                                searchInput.addEventListener('input', function() {
-                                    clearTimeout(searchTimeout);
-                                    searchTimeout = setTimeout(function() {
-                                        searchForm.submit();
-                                    }, 400);
-                                });
-                            }
-                            if (statusFilter && searchForm) {
-                                statusFilter.addEventListener('change', function() {
-                                    searchForm.submit();
-                                });
-                            }
-                        });
-                        </script>
+                <!-- Equipment Tabs -->
+                <ul class="nav nav-tabs mb-4" id="equipmentTabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests" type="button" role="tab" aria-controls="requests" aria-selected="true">Requests</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="equipment-list-tab" data-bs-toggle="tab" data-bs-target="#equipment-list" type="button" role="tab" aria-controls="equipment-list" aria-selected="false">Equipment List</button>
+                  </li>
+                </ul>
+                <div class="tab-content" id="equipmentTabsContent">
+                  <!-- Requests Tab -->
+                  <div class="tab-pane fade show active" id="requests" role="tabpanel" aria-labelledby="requests-tab">
+                    <div class="card mb-5 shadow rounded-3">
+                      <div class="card-body">
+                        <h4 class="mb-3">Equipment Requests</h4>
                         <div class="table-responsive mb-0">
-                            <table class="table table-bordered table-striped mb-0">
-                                <thead class="thead-dark">
-                                    <tr>
-                                        <th>No.</th>
-                                        <th>Equipment Name</th>
-                                        <th>Equipment Price</th>
-                                        <th>Depreciation / Rental Fee</th>
-                                        <th>Status</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    $no = $offset + 1;
-                                    if ($result->num_rows > 0): 
-                                        while ($row = $result->fetch_assoc()): ?>
-                                    <tr>
-                                        <td><?php echo $no++; ?></td>
-                                                <td><?php echo htmlspecialchars($row['equipment_name']); ?></td>
-                                                <td>
-                                                    <?php
-                                                    if ($row['category'] == 'Company') {
-                                                        echo isset($row['equipment_price']) && $row['equipment_price'] !== '' ? '₱ ' . number_format($row['equipment_price'], 2) : 'N/A';
-                                                    } else {
-                                                        echo '—';
-                                                    }
-                                                    ?>
-                                                </td>
-                                                <td>
-                                                    <?php
-                                                    if ($row['category'] == 'Rental') {
-                                                        echo isset($row['rental_fee']) && $row['rental_fee'] !== '' ? '₱ ' . number_format($row['rental_fee'], 2) : 'N/A';
-                                                    } else {
-                                                        if (isset($row['depreciation']) && $row['depreciation'] !== '') {
-                                                            $depr = $row['depreciation'];
-                                                            echo (intval($depr) == floatval($depr)) ? intval($depr) . ' years' : number_format($depr, 2) . ' years';
-                                                        } else {
-                                                            echo 'N/A';
-                                                        }
-                                                    }
-                                                    ?>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-<?php echo ($row['status'] == 'Available') ? 'success' : 'warning'; ?>">
-                                                        <?php echo htmlspecialchars($row['status']); ?>
-                                                    </span>
-                                                </td>
-                                        <td class="text-center">
-                                            <div class="action-buttons">
-                                                <a href="#" class="btn btn-sm btn-primary text-white font-weight-bold" data-bs-toggle="modal" data-bs-target="#viewModal<?php echo $row['id']; ?>">
-                                                    <i class="fas fa-eye"></i> View More
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                        <?php endwhile; ?>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center">No equipment found</td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                          <table class="table table-bordered table-striped mb-0">
+                            <thead class="thead-dark">
+                              <tr>
+                                <th>No.</th>
+                                <th>Equipment Name</th>
+                                <th class="text-center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <?php if (count($pending_requests) > 0): $no = 1; foreach ($pending_requests as $req): ?>
+                                <tr>
+                                  <td><?php echo $no++; ?></td>
+                                  <td><?php echo htmlspecialchars($req['equipment_name']); ?></td>
+                                  <td class="text-center">
+                                    <form method="post" style="display:inline-block">
+                                      <input type="hidden" name="pae_id" value="<?php echo $req['pae_id']; ?>">
+                                      <input type="hidden" name="equipment_id" value="<?php echo $req['equipment_id']; ?>">
+                                      <input type="hidden" name="request_action" value="approve">
+                                      <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                                    </form>
+                                    <form method="post" style="display:inline-block">
+                                      <input type="hidden" name="pae_id" value="<?php echo $req['pae_id']; ?>">
+                                      <input type="hidden" name="equipment_id" value="<?php echo $req['equipment_id']; ?>">
+                                      <input type="hidden" name="request_action" value="reject">
+                                      <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                                    </form>
+                                  </td>
+                                </tr>
+                              <?php endforeach; else: ?>
+                                <tr><td colspan="3" class="text-center">No pending requests</td></tr>
+                              <?php endif; ?>
+                            </tbody>
+                          </table>
                         </div>
-                        <nav aria-label="Page navigation" class="mt-3 mb-3">
-                            <ul class="pagination justify-content-center custom-pagination-green mb-0">
-                                <li class="page-item<?php if($page <= 1) echo ' disabled'; ?>">
-                                    <a class="page-link" href="?page=<?php echo $page-1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($status_filter) ? '&status=' . urlencode($status_filter) : ''; ?>">Previous</a>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Equipment List Tab -->
+                  <div class="tab-pane fade" id="equipment-list" role="tabpanel" aria-labelledby="equipment-list-tab">
+                    <div class="card mb-5 shadow rounded-3">
+                        <div class="card-body">
+                            <div class="mb-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                                <h4 class="mb-0">Equipment List</h4>
+                                <button type="button" class="btn btn-success ms-auto" data-bs-toggle="modal" data-bs-target="#addEquipmentModal">
+                                    <i class="fas fa-plus"></i> Add New Equipment
+                                </button>
+                                <a href="#" class="btn btn-danger ms-2 exportPdfBtn">
+                                    <i class="fas fa-file-pdf"></i> Export as PDF
+                                </a>
+                            </div>
+                            <hr>
+                            <form class="d-flex flex-wrap gap-2 mb-3" method="get" action="" id="searchForm" style="min-width:260px; max-width:600px;">
+                                <div class="input-group" style="min-width:220px; max-width:320px;">
+                                    <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                                    <input type="text" class="form-control border-start-0" name="search" placeholder="Search equipment name or purpose" value="<?php echo htmlspecialchars($search); ?>" id="searchInput" autocomplete="off">
+                                    </div>
+                                <select name="status" class="form-control" style="max-width:180px;" id="statusFilter">
+                                            <option value="">All Status</option>
+                                            <?php 
+                                            $statuses->data_seek(0); // Reset the pointer
+                                            while ($status = $statuses->fetch_assoc()): ?>
+                                        <option value="<?php echo htmlspecialchars($status['status']); ?>" <?php echo ($status_filter == $status['status']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($status['status']); ?></option>
+                                            <?php endwhile; ?>
+                                        </select>
+                            </form>
+                            <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                var searchInput = document.getElementById('searchInput');
+                                var statusFilter = document.getElementById('statusFilter');
+                                var searchForm = document.getElementById('searchForm');
+                                if (searchInput && searchForm) {
+                                    var searchTimeout;
+                                    searchInput.addEventListener('input', function() {
+                                        clearTimeout(searchTimeout);
+                                        searchTimeout = setTimeout(function() {
+                                            searchForm.submit();
+                                        }, 400);
+                                    });
+                                }
+                                if (statusFilter && searchForm) {
+                                    statusFilter.addEventListener('change', function() {
+                                        searchForm.submit();
+                                    });
+                                }
+                            });
+                            </script>
+                            <div class="table-responsive mb-0">
+                                <table class="table table-bordered table-striped mb-0">
+                                    <thead class="thead-dark">
+                                        <tr>
+                                            <th>No.</th>
+                                            <th>Equipment Name</th>
+                                            <th>Equipment Price</th>
+                                            <th>Depreciation / Rental Fee</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $no = $offset + 1;
+                                        if ($result->num_rows > 0): 
+                                            while ($row = $result->fetch_assoc()): ?>
+                                        <tr>
+                                            <td><?php echo $no++; ?></td>
+                                                    <td><?php echo htmlspecialchars($row['equipment_name']); ?></td>
+                                                    <td>
+                                                        <?php
+                                                        if ($row['category'] == 'Company') {
+                                                            echo isset($row['equipment_price']) && $row['equipment_price'] !== '' ? '₱ ' . number_format($row['equipment_price'], 2) : 'N/A';
+                                                        } else {
+                                                            echo '—';
+                                                        }
+                                                        ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php
+                                                        if ($row['category'] == 'Rental') {
+                                                            echo isset($row['rental_fee']) && $row['rental_fee'] !== '' ? '₱ ' . number_format($row['rental_fee'], 2) : 'N/A';
+                                                        } else {
+                                                            if (isset($row['depreciation']) && $row['depreciation'] !== '') {
+                                                                $depr = $row['depreciation'];
+                                                                echo (intval($depr) == floatval($depr)) ? intval($depr) . ' years' : number_format($depr, 2) . ' years';
+                                                            } else {
+                                                                echo 'N/A';
+                                                            }
+                                                        }
+                                                        ?>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-<?php echo ($row['status'] == 'Available') ? 'success' : 'warning'; ?>">
+                                                            <?php echo htmlspecialchars($row['status']); ?>
+                                                        </span>
+                                                    </td>
+                                            <td class="text-center">
+                                                <div class="action-buttons">
+                                                    <a href="#" class="btn btn-sm btn-primary text-white font-weight-bold" data-bs-toggle="modal" data-bs-target="#viewModal<?php echo $row['id']; ?>">
+                                                        <i class="fas fa-eye"></i> View More
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                            <?php endwhile; ?>
+                                        <?php else: ?>
+                                            <tr>
+                                                <td colspan="6" class="text-center">No equipment found</td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <nav aria-label="Page navigation" class="mt-3 mb-3">
+                                <ul class="pagination justify-content-center custom-pagination-green mb-0">
+                                    <li class="page-item<?php if($page <= 1) echo ' disabled'; ?>">
+                                        <a class="page-link" href="?page=<?php echo $page-1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($status_filter) ? '&status=' . urlencode($status_filter) : ''; ?>">Previous</a>
                                                 </li>
                                 <?php for($i = 1; $i <= $total_pages; $i++): ?>
                                     <li class="page-item<?php if($i == $page) echo ' active'; ?>">
@@ -409,34 +538,31 @@ $result = $con->query($sql);
                 </div>
                 <form action="add_equipment.php" method="POST">
                     <input type="hidden" name="status" value="Available">
-                    <div class="form-group mb-3">
-                        <label>Category</label>
-                        <select class="form-control" name="category" id="categorySelect" required>
-                            <option value="Company">Company</option>
-                            <option value="Rental">Rental</option>
-                        </select>
-                    </div>
                     <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
+                        <div class="row g-3">
+                            <div class="col-md-12">
                                 <div class="form-group mb-3">
-                                    <label>Equipment Name *</label>
-                                    <input type="text" class="form-control" name="equipment_name" required>
+                                    <label for="categorySelect">Category</label>
+                                    <select class="form-control" name="category" id="categorySelect" required>
+                                        <option value="Company">Company</option>
+                                        <option value="Rental">Rental</option>
+                                    </select>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="equipmentNameInput">Equipment Name *</label>
+                                    <input type="text" class="form-control" id="equipmentNameInput" name="equipment_name" required>
                                 </div>
                                 <div class="form-group mb-3" id="equipmentPriceField">
-                                    <label>Equipment Price</label>
-                                    <input type="number" step="0.01" min="0" class="form-control" name="equipment_price">
+                                    <label for="equipmentPriceInput">Equipment Price</label>
+                                    <input type="number" step="0.01" min="0" class="form-control" id="equipmentPriceInput" name="equipment_price">
                                 </div>
                                 <div class="form-group mb-3" id="depreciationField">
-                                    <label>Depreciation (Years)</label>
-                                    <input type="number" step="0.01" min="0" class="form-control" name="depreciation">
+                                    <label for="depreciationInput">Depreciation (Years)</label>
+                                    <input type="number" step="0.01" min="0" class="form-control" id="depreciationInput" name="depreciation">
                                 </div>
                                 <div class="form-group mb-3" id="rentalFeeField" style="display:none;">
-                                    <label>Rental Fee</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">₱</span>
-                                        <input type="number" step="0.01" min="0" class="form-control" name="rental_fee">
-                                    </div>
+                                    <label for="rentalFeeInput">Rental Fee</label>
+                                    <input type="number" step="0.01" min="0" class="form-control" id="rentalFeeInput" name="rental_fee">
                                 </div>
                             </div>
                         </div>
@@ -702,6 +828,15 @@ $result = $con->query($sql);
     <?php elseif (isset($_GET['error'])): ?>
     document.addEventListener('DOMContentLoaded', function() {
       showFeedbackModal(false, decodeURIComponent('<?php echo $_GET['error']; ?>'), '', 'error');
+    });
+    <?php endif; ?>
+    <?php if (isset($_GET['approved']) && $_GET['approved'] === '1'): ?>
+    document.addEventListener('DOMContentLoaded', function() {
+      showFeedbackModal(true, 'Equipment request approved successfully!', '', 'approved');
+    });
+    <?php elseif (isset($_GET['rejected']) && $_GET['rejected'] === '1'): ?>
+    document.addEventListener('DOMContentLoaded', function() {
+      showFeedbackModal(true, 'Equipment request rejected successfully!', '', 'rejected');
     });
     <?php endif; ?>
     </script>

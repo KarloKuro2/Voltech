@@ -179,8 +179,10 @@ $proj_equipments = [];
 $equip_total = 0;
 $equip_query = mysqli_query($con, "SELECT pae.*, e.equipment_name, e.equipment_price, e.depreciation, pae.status FROM project_add_equipment pae LEFT JOIN equipment e ON pae.equipment_id = e.id WHERE pae.project_id = '$project_id'");
 while ($row = mysqli_fetch_assoc($equip_query)) {
-    $equip_total += floatval($row['total']); // Always add to total
-    if ($row['status'] === 'in use') {
+    if ($row['status'] !== 'Pending') {
+        $equip_total += floatval($row['total']); // Only add if not Pending
+    }
+    if ($row['status'] === 'In Use') {
         $proj_equipments[] = $row; // Only show in table if in use
     }
 }
@@ -563,7 +565,7 @@ if ($userid) {
                                 </td>
                                 <td><?php echo isset($eq['total']) ? number_format($eq['total'], 2) : ''; ?></td>
                                 <td>
-                                  <?php if ($eq['status'] == 'in use'): ?>
+                                  <?php if ($eq['status'] == 'In Use'): ?>
                                     <form method="post" style="display:inline;">
                                       <input type="hidden" name="report_equipment" value="1">
                                       <input type="hidden" name="report_row_id" value="<?php echo $eq['id']; ?>">
@@ -769,16 +771,11 @@ if ($userid) {
       <form method="post">
         <div class="modal-body">
           <input type="hidden" name="add_project_equipment" value="1">
-          <div class="form-group mb-2">
-            <label for="equipmentSelect">Equipment</label>
-            <select class="form-control" id="equipmentSelect" name="equipment_id" required>
-              <option value="" disabled selected>Select Equipment</option>
-            </select>
-          </div>
+          
           <script>
             // Store all equipment data in JS for filtering
             var allEquipment = <?php
-              $all_equipment = mysqli_query($con, "SELECT * FROM equipment WHERE status = 'Available' ORDER BY equipment_name ASC");
+              $all_equipment = mysqli_query($con, "SELECT * FROM equipment WHERE status = 'Available' AND approval = 'Approved' ORDER BY equipment_name ASC");
               $equipment_js = [];
               while ($eq = mysqli_fetch_assoc($all_equipment)) {
                 $equipment_js[] = [
@@ -806,6 +803,12 @@ if ($userid) {
               foreach ($equipment_categories as $cat): ?>
                 <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
               <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group mb-2">
+            <label for="equipmentSelect">Equipment</label>
+            <select class="form-control" id="equipmentSelect" name="equipment_id" required>
+              <option value="" disabled selected>Select Equipment</option>
             </select>
           </div>
           <div class="form-group mb-2" id="rentGroup" style="display:none;">
@@ -1252,6 +1255,12 @@ function showFeedbackModal(success, message) {
     showFeedbackModal(true, 'Material removed successfully!');
   } else if (params.get('returnmat') === '1') {
     showFeedbackModal(true, 'Material returned to inventory!');
+  } else if (params.get('addequip') === '1') {
+    showFeedbackModal(true, 'Equipment added successfully!');
+  } else if (params.get('addemp') === '1') {
+    showFeedbackModal(true, 'Employee added successfully!');
+  } else if (params.get('removeemp') === '1') {
+    showFeedbackModal(true, 'Employee removed successfully!');
   } else if (params.get('error') === 'material_exists') {
     showFeedbackModal(false, 'Material already added to this project!');
   } else if (params.get('error') === 'insufficient_stock') {
