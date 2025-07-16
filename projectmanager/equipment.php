@@ -270,7 +270,7 @@ $result = $con->query($sql);
                                         <th>No.</th>
                                         <th>Equipment Name</th>
                                         <th>Equipment Price</th>
-                                        <th>Depreciation</th>
+                                        <th>Depreciation / Rental Fee</th>
                                         <th>Status</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
@@ -283,8 +283,29 @@ $result = $con->query($sql);
                                     <tr>
                                         <td><?php echo $no++; ?></td>
                                                 <td><?php echo htmlspecialchars($row['equipment_name']); ?></td>
-                                                <td><?php echo isset($row['equipment_price']) ? number_format($row['equipment_price'], 2) : ''; ?></td>
-                                                <td><?php echo isset($row['depreciation']) ? htmlspecialchars($row['depreciation']) . ' years' : ''; ?></td>
+                                                <td>
+                                                    <?php
+                                                    if (isset($row['category']) && $row['category'] == 'Company') {
+                                                        echo isset($row['equipment_price']) && $row['equipment_price'] !== '' ? '₱ ' . number_format($row['equipment_price'], 2) : 'N/A';
+                                                    } else {
+                                                        echo '—';
+                                                    }
+                                                    ?>
+                                                </td>
+                                                <td>
+                                                    <?php
+                                                    if (isset($row['category']) && $row['category'] == 'Rental') {
+                                                        echo isset($row['rental_fee']) && $row['rental_fee'] !== '' ? '₱ ' . number_format($row['rental_fee'], 2) : 'N/A';
+                                                    } else {
+                                                        if (isset($row['depreciation']) && $row['depreciation'] !== '') {
+                                                            $depr = $row['depreciation'];
+                                                            echo (intval($depr) == floatval($depr)) ? intval($depr) . ' years' : number_format($depr, 2) . ' years';
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                    }
+                                                    ?>
+                                                </td>
                                                 <td>
                                                     <span class="badge bg-<?php echo ($row['status'] == 'Available') ? 'success' : 'warning'; ?>">
                                                         <?php echo htmlspecialchars($row['status']); ?>
@@ -301,7 +322,7 @@ $result = $con->query($sql);
                                         <?php endwhile; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="text-center">No equipment found</td>
+                                            <td colspan="6" class="text-center">No equipment found</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>

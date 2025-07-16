@@ -153,7 +153,7 @@ while ($row = mysqli_fetch_assoc($employees_result)) {
     $employees[] = $row;
 }
 // Fetch materials for dropdown
-$materials_result = mysqli_query($con, "SELECT * FROM materials ORDER BY material_name ASC");
+$materials_result = mysqli_query($con, "SELECT * FROM materials WHERE status = 'Available' ORDER BY material_name ASC");
 $materials = [];
 while ($row = mysqli_fetch_assoc($materials_result)) {
     $materials[] = $row;
@@ -169,7 +169,7 @@ while ($row = mysqli_fetch_assoc($emp_query)) {
 // Fetch project materials
 $proj_mats = [];
 $mat_total = 0;
-$mat_query = mysqli_query($con, "SELECT pam.*, m.supplier_name FROM project_add_materials pam LEFT JOIN materials m ON pam.material_id = m.id WHERE pam.project_id = '$project_id'");
+$mat_query = mysqli_query($con, "SELECT pam.*, m.supplier_name, m.amount FROM project_add_materials pam LEFT JOIN materials m ON pam.material_id = m.id WHERE pam.project_id = '$project_id'");
 while ($row = mysqli_fetch_assoc($mat_query)) {
     $proj_mats[] = $row;
     $mat_total += floatval($row['total']);
@@ -476,17 +476,17 @@ if ($userid) {
                                 <td><?php echo $i++; ?></td>
                                 <td style="font-weight:bold;color:#222;"><?php echo htmlspecialchars($mat['material_name']); ?></td>
                                 <td><?php echo htmlspecialchars($mat['unit']); ?></td>
-                                <td><?php echo number_format($mat['material_price'], 2); ?></td>
+                                <td><?php echo number_format($mat['amount'], 2); ?></td>
                                 <td>
                                   <form method="post" style="display:inline-block;width:110px;">
                                     <input type="hidden" name="row_id" value="<?php echo $mat['id']; ?>">
-                                    <input type="hidden" name="price" value="<?php echo $mat['material_price']; ?>">
+                                    <input type="hidden" name="price" value="<?php echo $mat['amount']; ?>">
                                     <input type="number" name="quantity" value="<?php echo $mat['quantity']; ?>" min="1" style="width:60px;display:inline-block;" <?php if ($project['io'] == '2') echo 'disabled'; ?>>
                                     <button type="submit" name="update_project_material_qty" class="btn btn-sm btn-primary" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Update</button>
                                   </form>
                                 </td>
                                 <td><?php echo isset($mat['supplier_name']) && $mat['supplier_name'] ? htmlspecialchars($mat['supplier_name']) : 'N/A'; ?></td>
-                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format($mat['total'], 2); ?></td>
+                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format($mat['amount'] * $mat['quantity'], 2); ?></td>
                                 <td>
                                   <form method="post" style="display:inline;">
                                     <input type="hidden" name="row_id" value="<?php echo $mat['id']; ?>">
@@ -1211,6 +1211,67 @@ document.addEventListener('DOMContentLoaded', function() {
   showFields();
 });
 </script>
+<!-- Feedback Modal (Unified for Success/Error) -->
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center">
+      <div class="modal-body">
+        <span id="feedbackIcon" style="font-size: 3rem;"></span>
+        <h4 id="feedbackTitle"></h4>
+        <p id="feedbackMessage"></p>
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function showFeedbackModal(success, message) {
+  var icon = document.getElementById('feedbackIcon');
+  var title = document.getElementById('feedbackTitle');
+  var msg = document.getElementById('feedbackMessage');
+  if (success) {
+    icon.innerHTML = '<i class="fas fa-check-circle" style="color:#28a745"></i>';
+    title.textContent = 'Success!';
+    msg.textContent = message;
+  } else {
+    icon.innerHTML = '<i class="fas fa-times-circle" style="color:#dc3545"></i>';
+    title.textContent = 'Error!';
+    msg.textContent = message;
+  }
+  var feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+  feedbackModal.show();
+  // Remove the query param after showing the modal
+  window.history.replaceState({}, document.title, window.location.pathname + window.location.search.replace(/([&?](addmat|removemat|returnmat|error)=[^&]*)/, ''));
+}
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var left = params.get('left');
+  if (params.get('addmat') === '1') {
+    showFeedbackModal(true, 'Material added successfully!');
+  } else if (params.get('removemat') === '1') {
+    showFeedbackModal(true, 'Material removed successfully!');
+  } else if (params.get('returnmat') === '1') {
+    showFeedbackModal(true, 'Material returned to inventory!');
+  } else if (params.get('error') === 'material_exists') {
+    showFeedbackModal(false, 'Material already added to this project!');
+  } else if (params.get('error') === 'insufficient_stock') {
+    var msg = 'Insufficient stock. Not enough material available.';
+    if (left !== null) msg += ' Only ' + left + ' left.';
+    showFeedbackModal(false, msg);
+  } else if (params.get('error') === 'insufficient_slots') {
+    var msg = 'Insufficient warehouse slots. Not enough space in the warehouse.';
+    if (left !== null) msg += ' Only ' + left + ' slots left.';
+    showFeedbackModal(false, msg);
+  }
+})();
+</script>
+<?php if (isset($_GET['error']) && $_GET['error'] === 'material_exists'): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  alert('Material already added to this project!');
+});
+</script>
+<?php endif; ?>
 </body>
 
 </html>

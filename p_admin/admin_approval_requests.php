@@ -102,14 +102,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve_type'], $_POS
         $con->query("UPDATE $table SET approval = 'Approved', approval_date = NOW() WHERE id = $id");
         // Insert into order_expenses for material
         if ($type === 'material') {
-            $mat = $con->query("SELECT total_amount FROM materials WHERE id = $id")->fetch_assoc();
+            $mat = $con->query("SELECT total_amount, quantity, location FROM materials WHERE id = $id")->fetch_assoc();
             $expense = isset($mat['total_amount']) ? floatval($mat['total_amount']) : 0;
+            $mat_qty = isset($mat['quantity']) ? intval($mat['quantity']) : 0;
+            $mat_location = isset($mat['location']) ? $mat['location'] : '';
             if ($expense > 0) {
                 $desc = "Purchased A $item_name";
                 $stmt = $con->prepare("INSERT INTO order_expenses (user_id, expense, expensedate, expensecategory, description) VALUES (?, ?, NOW(), 'Material', ?)");
                 $stmt->bind_param("ids", $user_id, $expense, $desc);
                 $stmt->execute();
                 $stmt->close();
+            }
+            // MINUS quantity sa warehouse (add to used_slots)
+            if ($mat_location && $mat_qty > 0) {
+                $con->query("UPDATE warehouses SET used_slots = used_slots + $mat_qty WHERE warehouse = '" . $con->real_escape_string($mat_location) . "'");
             }
         }
         // Insert into order_expenses for equipment

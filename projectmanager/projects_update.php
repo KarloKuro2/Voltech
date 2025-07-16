@@ -60,11 +60,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project_employ
 // Update Material Quantity
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_project_material_qty'])) {
     $row_id = intval($_POST['row_id']);
-    $quantity = intval($_POST['quantity']);
+    $new_quantity = intval($_POST['quantity']);
     $price = floatval($_POST['price']);
-    $total = $quantity * $price;
     $project_id = intval($_GET['id']);
-    mysqli_query($con, "UPDATE project_add_materials SET quantity='$quantity', total='$total' WHERE id='$row_id' AND project_id='$project_id'");
+
+    // 1. Get old quantity and material_id
+    $res = mysqli_query($con, "SELECT quantity, material_id FROM project_add_materials WHERE id='$row_id' AND project_id='$project_id' LIMIT 1");
+    $row = mysqli_fetch_assoc($res);
+    $old_quantity = intval($row['quantity']);
+    $material_id = intval($row['material_id']);
+
+    // 2. Compute difference
+    $diff = $new_quantity - $old_quantity;
+    if ($diff != 0) {
+        // 3. Update main materials table
+        // If diff > 0, subtract from inventory; if diff < 0, add to inventory
+        mysqli_query($con, "UPDATE materials SET quantity = quantity - ($diff) WHERE id = '$material_id'");
+        // 4. Update used_slots in the warehouse
+        $loc_res = mysqli_query($con, "SELECT location FROM materials WHERE id = '$material_id' LIMIT 1");
+        $loc_row = mysqli_fetch_assoc($loc_res);
+        $warehouse = mysqli_real_escape_string($con, $loc_row['location']);
+        if ($diff > 0) {
+            // Tinaasan: bawas sa used_slots
+            mysqli_query($con, "UPDATE warehouses SET used_slots = used_slots - $diff WHERE warehouse = '$warehouse'");
+            error_log("[WAREHOUSE LOG] Increased project qty for material_id=$material_id, diff=$diff, warehouse='$warehouse' (used_slots -$diff)");
+        } else {
+            // Binawasan: dagdag sa used_slots
+            $add_back = abs($diff);
+            mysqli_query($con, "UPDATE warehouses SET used_slots = used_slots + $add_back WHERE warehouse = '$warehouse'");
+            error_log("[WAREHOUSE LOG] Decreased project qty for material_id=$material_id, diff=$diff, warehouse='$warehouse' (used_slots +$add_back)");
+        }
+    }
+
+    // 5. Update project_add_materials
+    $total = $new_quantity * $price;
+    mysqli_query($con, "UPDATE project_add_materials SET quantity='$new_quantity', total='$total' WHERE id='$row_id' AND project_id='$project_id'");
+
     header("Location: project_details.php?id=$project_id");
     exit();
 } 
