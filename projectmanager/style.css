@@ -1,0 +1,159 @@
+:root {
+    --main-text-color: #009d63;
+    --second-text-color: #bbbec5;
+  }
+  
+  .primary-text {
+    color: var(--main-text-color);
+  }
+  
+  .second-text {
+    color: var(--second-text-color);
+  }
+  
+  .primary-bg {
+    background-color: var(--main-bg-color);
+  }
+  
+  .secondary-bg {
+    background-color: var(--second-bg-color);
+  }
+  
+  .rounded-full {
+    border-radius: 100%;
+  }
+  
+  #wrapper {
+    overflow-x: hidden;
+    background-color: #efefef;
+  }
+  
+  #sidebar-wrapper {
+    min-height: 100vh;
+    margin-left: -15rem;
+    -webkit-transition: margin 0.25s ease-out;
+    -moz-transition: margin 0.25s ease-out;
+    -o-transition: margin 0.25s ease-out;
+    transition: margin 0.25s ease-out;
+    background-color: #009d63 !important;
+  }
+  
+  #sidebar-wrapper .sidebar-heading {
+    padding: 0.875rem 1.25rem;
+    font-size: 1.2rem;
+  }
+  
+  #sidebar-wrapper .list-group {
+    width: 15rem;
+  }
+  
+  #page-content-wrapper {
+    min-width: 100vw;
+  }
+  
+  #wrapper.toggled #sidebar-wrapper {
+    margin-left: 0;
+  }
+  
+  #menu-toggle {
+    cursor: pointer;
+  }
+  
+  .list-group-item {
+    display: flex;
+    align-items: center;
+    border: none;
+    padding: 10px 30px;
+    color: #fff;
+}
+  
+.thead-gray th, .thead-gray td {
+  background-color: #e9ecef !important; /* Bootstrap gray */
+  color: #222 !important;
+}
+
+.table thead th {
+    background-color: #009d63;
+    color: #fff;
+    border-color: #009d63;
+  }
+
+  .list-group-item:hover {
+    background-color: #6fa06a !important; /* Slightly darker green for hover */
+    color: #fff;
+}
+  
+  .list-group-item.active, .list-group-item:active {
+    background-color: #efefef !important;
+    color: #009d63 !important;
+    font-weight: bold;
+    border: none;
+    border-top-left-radius: 25px;   /* Curve top-left */
+    border-bottom-left-radius: 25px; /* Curve bottom-left */
+}
+
+  .controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+  .controls-row > * {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+  
+  .sidebar-profile-img {
+    width: 120px !important;
+    height: 120px !important;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 10px;
+}
+  
+    .list-group-item i {
+    margin-right: 18px !important;
+    min-width: 22px;
+    text-align: center;
+    font-size: 1.1em;
+}
+  
+  @media (min-width: 768px) {
+    #sidebar-wrapper {
+      margin-left: 0;
+    }
+  
+    #page-content-wrapper {
+      min-width: 0;
+      width: 100%;
+    }
+  
+    #wrapper.toggled #sidebar-wrapper {
+      margin-left: -15rem;
+    }
+    
+  }
+
+  
+
+.custom-pagination-green .page-item.active .page-link,
+.custom-pagination-green .page-item .page-link:focus,
+.custom-pagination-green .page-item .page-link:hover {
+  background-color: #009d63 !important;
+  border-color: #009d63 !important;
+  color: #fff !important;
+}
+.custom-pagination-green .page-link {
+  color: #009d63;
+  border-radius: 6px;
+  border: 1px solid #009d6322;
+  margin: 0 2px;
+  transition: background 0.2s, color 0.2s;
+}
+.custom-pagination-green .page-item.disabled .page-link {
+  color: #aaa;
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+}

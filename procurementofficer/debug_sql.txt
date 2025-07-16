@@ -1,0 +1,1 @@
+UPDATE projects SET file_photo_lgu='lgu_0_1752557303.jpg',file_photo_barangay='barangay_0_1752557303.jpg',file_photo_fire='fire_0_1752557303.jpg',file_photo_occupancy='occupancy_0_1752557303.jpg' WHERE project_id='0'

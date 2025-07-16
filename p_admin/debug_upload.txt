@@ -1,0 +1,57 @@
+Array
+(
+    [project_id] => 0
+    [user_id] => 63
+    [update_fields] => Array
+        (
+            [0] => file_photo_lgu='lgu_0_1752557303.jpg'
+            [1] => file_photo_barangay='barangay_0_1752557303.jpg'
+            [2] => file_photo_fire='fire_0_1752557303.jpg'
+            [3] => file_photo_occupancy='occupancy_0_1752557303.jpg'
+        )
+
+    [FILES] => Array
+        (
+            [file_photo_lgu] => Array
+                (
+                    [name] => BINI-will-unveil-a-fiercer-look-sound-and-attitude-at-their-grand-two-part-launch-this-June-on-KTX.PH-2 (1).jpg
+                    [full_path] => BINI-will-unveil-a-fiercer-look-sound-and-attitude-at-their-grand-two-part-launch-this-June-on-KTX.PH-2 (1).jpg
+                    [type] => image/jpeg
+                    [tmp_name] => C:\xampp\tmp\phpCF7C.tmp
+                    [error] => 0
+                    [size] => 382471
+                )
+
+            [file_photo_barangay] => Array
+                (
+                    [name] => Bini-Makes-Official-Debut-in-Two-Part-Event-on-KTX.PH-3.jpg
+                    [full_path] => Bini-Makes-Official-Debut-in-Two-Part-Event-on-KTX.PH-3.jpg
+                    [type] => image/jpeg
+                    [tmp_name] => C:\xampp\tmp\phpCF7D.tmp
+                    [error] => 0
+                    [size] => 324686
+                )
+
+            [file_photo_fire] => Array
+                (
+                    [name] => BINI-will-unveil-a-fiercer-look-sound-and-attitude-at-their-grand-two-part-launch-this-June-on-KTX.PH-2.jpg
+                    [full_path] => BINI-will-unveil-a-fiercer-look-sound-and-attitude-at-their-grand-two-part-launch-this-June-on-KTX.PH-2.jpg
+                    [type] => image/jpeg
+                    [tmp_name] => C:\xampp\tmp\phpCF7E.tmp
+                    [error] => 0
+                    [size] => 382471
+                )
+
+            [file_photo_occupancy] => Array
+                (
+                    [name] => BINI-2.jpg
+                    [full_path] => BINI-2.jpg
+                    [type] => image/jpeg
+                    [tmp_name] => C:\xampp\tmp\phpCF7F.tmp
+                    [error] => 0
+                    [size] => 377952
+                )
+
+        )
+
+)
