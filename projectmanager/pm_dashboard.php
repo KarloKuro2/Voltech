@@ -378,7 +378,7 @@ if ($userid) {
                             <div>
                                 <h3 class="fs-2">
                                 <?php
-                                      $equip_query = mysqli_query($con, "SELECT COUNT(*) as count FROM equipment");
+                                      $equip_query = mysqli_query($con, "SELECT COUNT(*) as count FROM equipment WHERE user_id='$userid'");
                                       $equip_result = mysqli_fetch_assoc($equip_query);
                                       echo number_format($equip_result['count'] ?? 0);
                                       ?>
@@ -410,7 +410,7 @@ if ($userid) {
                             <div>
                                 <h3 class="fs-2">
                                 <?php
-                                      $emp_query = mysqli_query($con, "SELECT COUNT(*) as count FROM employees");
+                                      $emp_query = mysqli_query($con, "SELECT COUNT(*) as count FROM employees WHERE user_id='$userid'");
                                       $emp_result = mysqli_fetch_assoc($emp_query);
                                       echo number_format($emp_result['count'] ?? 0);
                                       ?>
