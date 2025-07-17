@@ -9,35 +9,46 @@ if ($con->connect_error) {
 $sql = "SELECT category, material_name, quantity, unit, status, supplier_name, total_amount FROM materials ORDER BY category, material_name";
 $result = $con->query($sql);
 
-class PDF extends FPDF {
-    function Header() {
-        $this->SetFont('Arial','B',14);
-        $this->Cell(0,10,'Materials List',0,1,'C');
-        $this->Ln(2);
-    }
-    function Footer() {
-        $this->SetY(-15);
-        $this->SetFont('Arial','I',8);
-        $this->Cell(0,10,'Page '.$this->PageNo().'/{nb}',0,0,'C');
-    }
-}
-
-$pdf = new PDF();
-$pdf->AliasNbPages();
-$pdf->AddPage('L', 'Letter'); // Use Letter size
+$pdf = new FPDF();
+$pdf->AddPage();
+// Voltech Letterhead
+$pdf->Image('../uploads/voltech_logo_transparent.png', 10, 10, 28);
+$pdf->SetXY(40, 12);
+$pdf->SetFont('Arial','B',15);
+$pdf->Cell(0,7,'VOLTECH ELECTRICAL CONSTRUCTION',0,1);
+$pdf->SetX(40);
 $pdf->SetFont('Arial','B',10);
+$pdf->SetTextColor(90,90,90);
+$pdf->Cell(0,6,'CONTRACTORS    ENGINEERS    DESIGNERS    CONSULTANTS',0,1);
+$pdf->SetX(40);
+$pdf->SetFont('Arial','',8);
+$pdf->SetTextColor(60,60,60);
+$pdf->Cell(0,5,'Office: 60 AT Reyes St., Pag-asa Mandaluyong City',0,1);
+$pdf->SetX(40);
+$pdf->Cell(0,5,'Prov. Address: 729 Malapit, San Isidro Nueva Ecija',0,1);
+$pdf->SetX(40);
+$pdf->Cell(0,5,'Contact Nos.: 0917 418 8456  •  0923 966 2079',0,1);
+$pdf->SetTextColor(0,0,0);
+$pdf->Ln(6);
+$pdf->SetDrawColor(120,120,120);
+$pdf->Line(10, $pdf->GetY(), 200, $pdf->GetY());
+$pdf->Ln(2);
+$pdf->SetFont('Arial','B',12);
+$pdf->Cell(0,7,'Procurement Officer',0,1,'L');
+$pdf->Ln(2);
+$pdf->SetFont('Arial','B',16);
+$pdf->Cell(0,10,'Materials List',0,1,'C');
+$pdf->Ln(2);
 
-$header = ['#', 'Category', 'Material Name', 'Quantity', 'Unit', 'Status', 'Supplier', 'Total Amount'];
-$widths = [10, 35, 50, 20, 20, 25, 45, 30];
-$leftMargin = 15; // You can adjust this value for more/less space
+// Table header
+$pdf->SetFont('Arial','B',10);
+$header = ['#', 'Category', 'Material Name', 'Qty', 'Unit', 'Status', 'Supplier', 'Total Amount'];
+$widths = [10, 28, 40, 15, 15, 20, 40, 32]; // Total: 180mm
+$leftMargin = 10;
 $pdf->SetLeftMargin($leftMargin);
-
-// Calculate total table width and center X
 $tableWidth = array_sum($widths);
 $pageWidth = $pdf->GetPageWidth() - 2 * $leftMargin;
 $x = ($pageWidth - $tableWidth) / 2 + $leftMargin;
-
-// Table header
 $pdf->SetX($x);
 foreach ($header as $i => $col) {
     $pdf->Cell($widths[$i], 8, $col, 1, 0, 'C');

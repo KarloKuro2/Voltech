@@ -169,7 +169,7 @@ while ($row = mysqli_fetch_assoc($emp_query)) {
 // Fetch project materials
 $proj_mats = [];
 $mat_total = 0;
-$mat_query = mysqli_query($con, "SELECT pam.*, m.supplier_name, m.amount FROM project_add_materials pam LEFT JOIN materials m ON pam.material_id = m.id WHERE pam.project_id = '$project_id'");
+$mat_query = mysqli_query($con, "SELECT pam.*, m.supplier_name, m.material_price, m.labor_other, m.unit, m.material_name FROM project_add_materials pam LEFT JOIN materials m ON pam.material_id = m.id WHERE pam.project_id = '$project_id'");
 while ($row = mysqli_fetch_assoc($mat_query)) {
     $proj_mats[] = $row;
     $mat_total += floatval($row['total']);
@@ -177,7 +177,7 @@ while ($row = mysqli_fetch_assoc($mat_query)) {
 // Fetch project equipments
 $proj_equipments = [];
 $equip_total = 0;
-$equip_query = mysqli_query($con, "SELECT pae.*, e.equipment_name, e.equipment_price, e.depreciation, pae.status FROM project_add_equipment pae LEFT JOIN equipment e ON pae.equipment_id = e.id WHERE pae.project_id = '$project_id'");
+$equip_query = mysqli_query($con, "SELECT pae.*, e.equipment_name, e.equipment_price AS price, e.depreciation, e.rental_fee, pae.status FROM project_add_equipment pae LEFT JOIN equipment e ON pae.equipment_id = e.id WHERE pae.project_id = '$project_id'");
 while ($row = mysqli_fetch_assoc($equip_query)) {
     if ($row['status'] !== 'Pending') {
         $equip_total += floatval($row['total']); // Only add if not Pending
@@ -311,9 +311,14 @@ if ($userid) {
                     $status_text = strip_tags($status_labels[$project['io']]);
                     echo ' (' . strtoupper($status_text) . ')';
                 ?></h4>
-                <a href="projects.php" class="btn btn-light btn-sm">
-                  <i class="fa fa-arrow-left"></i> Back to Projects
-                </a>
+                <div class="d-flex gap-2">
+                  <a href="projects.php" class="btn btn-light btn-sm">
+                    <i class="fa fa-arrow-left"></i> Back to Projects
+                  </a>
+                  <a href="export_project_pdf.php?id=<?php echo $project_id; ?>" class="btn btn-danger btn-sm" target="_blank">
+                    <i class="fas fa-file-export"></i> Generate
+                  </a>
+                </div>
               </div>
               <div class="card-body">
                 <div class="row">
@@ -322,8 +327,9 @@ if ($userid) {
                     <div class="card mb-4 shadow-sm">
                       <div class="card-header bg-success text-white d-flex align-items-center">
                         <h5 class="mb-0 flex-grow-1">Project Information</h5>
-                        <button type="button" class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#editProjectModal">Edit Project</button>
-                        <button type="button" class="btn btn-light btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#viewDocumentsModal">View Documents</button>
+                        <button type="button" class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#editProjectModal"><i class="fas fa-edit me-1"></i> Edit Project</button>
+                        <button type="button" class="btn btn-light btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#viewPermitsModal"><i class="fas fa-file-alt me-1"></i> View Permits</button>
+                        <button type="button" class="btn btn-light btn-sm ms-2 upload-files-btn" data-project-id="<?php echo $project_id; ?>" data-bs-toggle="modal" data-bs-target="#uploadFilesModal"><i class="fas fa-upload me-1"></i> Upload</button>
                       </div>
                       <div class="card-body">
                         <div class="row">
@@ -350,7 +356,7 @@ if ($userid) {
                     <div class="card mb-4 shadow-sm">
                       <div class="card-header bg-success text-white d-flex align-items-center">
                         <h5 class="mb-0 flex-grow-1">Project Progress</h5>
-                        <a href="project_progress.php?id=<?php echo $project_id; ?>" class="btn btn-light btn-sm ml-auto">Show more</a>
+                        <a href="project_progress.php?id=<?php echo $project_id; ?>" class="btn btn-light btn-sm ml-auto"><i class="fas fa-angle-double-right me-1"></i> Show more</a>
                       </div>
                       <div class="card-body">
                         <!-- Overall project progress bar -->
@@ -386,7 +392,7 @@ if ($userid) {
                       <div class="card-header bg-success text-white d-flex align-items-center">
                         <span class="flex-grow-1">Project Employees</span>
                         <?php if ($project['io'] == '1' || $project['io'] == '4'): ?>
-                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">Add Employee</button>
+                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addEmployeeModal"><i class="fas fa-user-plus me-1"></i> Add Employee</button>
                         <?php endif; ?>
                       </div>
                       <div class="card-body p-0">
@@ -398,50 +404,50 @@ if ($userid) {
                                 <th>Name</th>
                                 <th>Position</th>
                                 <th>Daily Rate</th>
-                                <th>Assigned Days</th>
-                                <th>Working Days</th>
+                                <th>Project Days</th>
                                 <th>Total</th>
                                 <th>Action</th>
                               </tr>
                             </thead>
                             <tbody>
+                              <?php
+                                // Compute project days once
+                                $start_date = $project['start_date'];
+                                $end_date = $project['deadline'];
+                                $start = new DateTime($start_date);
+                                $end = new DateTime($end_date);
+                                $interval = $start->diff($end);
+                                $project_days = $interval->days + 1;
+                              ?>
                               <?php if (count($proj_emps) > 0): $i = 1; foreach ($proj_emps as $emp): ?>
                               <tr>
                                 <td><?php echo $i++; ?></td>
                                 <td style="font-weight:bold;color:#222;"><?php echo htmlspecialchars(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? '')); ?></td>
                                 <td><?php echo htmlspecialchars($emp['position']); ?></td>
                                 <td><?php echo number_format($emp['daily_rate'], 2); ?></td>
-                                <td>
-                                  <form method="post" style="display:inline-block;width:110px;">
-                                    <input type="hidden" name="row_id" value="<?php echo $emp['id']; ?>">
-                                    <input type="number" name="days" value="<?php echo $emp['days']; ?>" min="1" style="width:60px;display:inline-block;" <?php if ($project['io'] == '2') echo 'disabled'; ?>>
-                                    <button type="submit" name="update_project_employee_days" class="btn btn-sm btn-primary" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Update</button>
-                                  </form>
-                                </td>
-                                <td>
-                                  <form method="post" style="display:inline-block;width:110px;">
-                                    <input type="hidden" name="row_id" value="<?php echo $emp['id']; ?>">
-                                    <input type="hidden" name="rate" value="<?php echo $emp['daily_rate']; ?>">
-                                    <input type="number" name="schedule" value="<?php echo $emp['schedule']; ?>" min="1" style="width:60px;display:inline-block;" <?php if ($project['io'] == '2') echo 'disabled'; ?>>
-                                    <button type="submit" name="update_project_employee_schedule" class="btn btn-sm btn-primary" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Update</button>
-                                  </form>
-                                </td>
-                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format($emp['total'], 2); ?></td>
+                                <td><?php echo $project_days; ?></td>
+                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format($emp['daily_rate'] * $project_days, 2); ?></td>
                                 <td>
                                   <form method="post" style="display:inline;">
                                     <input type="hidden" name="row_id" value="<?php echo $emp['id']; ?>">
-                                    <button type="submit" name="remove_project_employee" class="btn btn-sm btn-danger" onclick="return confirm('Remove this employee?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Remove</button>
+                                    <button type="submit" name="remove_project_employee" class="btn btn-sm btn-danger" onclick="return confirm('Remove this employee?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>><i class="fas fa-trash"></i> Remove</button>
                                   </form>
                                 </td>
                               </tr>
                               <?php endforeach; else: ?>
-                              <tr><td colspan="8" class="text-center">No employees added</td></tr>
+                              <tr><td colspan="7" class="text-center">No employees added</td></tr>
                               <?php endif; ?>
                             </tbody>
                             <tfoot>
                               <tr>
-                                <th colspan="6" class="text-right">Total</th>
-                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php echo number_format($emp_total, 2); ?></th>
+                                <th colspan="5" class="text-right">Total</th>
+                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php
+                                  $emp_total = 0;
+                                  foreach ($proj_emps as $emp) {
+                                    $emp_total += $emp['daily_rate'] * $project_days;
+                                  }
+                                  echo number_format($emp_total, 2);
+                                ?></th>
                               </tr>
                             </tfoot>
                           </table>
@@ -454,7 +460,7 @@ if ($userid) {
                       <div class="card-header bg-success text-white d-flex align-items-center">
                         <span class="flex-grow-1">Project Materials</span>
                         <?php if ($project['io'] == '1' || $project['io'] == '4'): ?>
-                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addMaterialsModal">Add Materials</button>
+                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addMaterialsModal"><i class="fas fa-plus-square me-1"></i> Add Materials</button>
                         <?php endif; ?>
                       </div>
                       <div class="card-body p-0">
@@ -465,7 +471,8 @@ if ($userid) {
                                 <th>No.</th>
                                 <th>Name</th>
                                 <th>Unit</th>
-                                <th>Price</th>
+                                <th>Material Price</th>
+                                <th>Labor/Other</th>
                                 <th>Quantity</th>
                                 <th>Supplier</th>
                                 <th>Total</th>
@@ -478,36 +485,36 @@ if ($userid) {
                                 <td><?php echo $i++; ?></td>
                                 <td style="font-weight:bold;color:#222;"><?php echo htmlspecialchars($mat['material_name']); ?></td>
                                 <td><?php echo htmlspecialchars($mat['unit']); ?></td>
-                                <td><?php echo number_format($mat['amount'], 2); ?></td>
-                                <td>
-                                  <form method="post" style="display:inline-block;width:110px;">
-                                    <input type="hidden" name="row_id" value="<?php echo $mat['id']; ?>">
-                                    <input type="hidden" name="price" value="<?php echo $mat['amount']; ?>">
-                                    <input type="number" name="quantity" value="<?php echo $mat['quantity']; ?>" min="1" style="width:60px;display:inline-block;" <?php if ($project['io'] == '2') echo 'disabled'; ?>>
-                                    <button type="submit" name="update_project_material_qty" class="btn btn-sm btn-primary" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Update</button>
-                                  </form>
-                                </td>
+                                <td><?php echo number_format($mat['material_price'], 2); ?></td>
+                                <td><?php echo number_format($mat['labor_other'], 2); ?></td>
+                                <td><?php echo $mat['quantity']; ?></td>
                                 <td><?php echo isset($mat['supplier_name']) && $mat['supplier_name'] ? htmlspecialchars($mat['supplier_name']) : 'N/A'; ?></td>
-                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format($mat['amount'] * $mat['quantity'], 2); ?></td>
+                                <td style="font-weight:bold;color:#222;">₱<?php echo number_format(($mat['material_price'] + $mat['labor_other']) * $mat['quantity'], 2); ?></td>
                                 <td>
                                   <form method="post" style="display:inline;">
                                     <input type="hidden" name="row_id" value="<?php echo $mat['id']; ?>">
-                                    <button type="submit" name="remove_project_material" class="btn btn-sm btn-danger" onclick="return confirm('Remove this material?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Remove</button>
+                                    <button type="submit" name="remove_project_material" class="btn btn-sm btn-danger" onclick="return confirm('Remove this material?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>><i class="fas fa-trash"></i> Remove</button>
                                   </form>
                                   <form method="post" style="display:inline;">
                                     <input type="hidden" name="row_id" value="<?php echo $mat['id']; ?>">
-                                    <button type="submit" name="return_project_material" class="btn btn-sm btn-warning" onclick="return confirm('Return this material to inventory?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Return</button>
+                                    <button type="submit" name="return_project_material" class="btn btn-sm btn-warning" onclick="return confirm('Return this material to inventory?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>><i class="fas fa-undo"></i> Return</button>
                                   </form>
                                 </td>
                               </tr>
                               <?php endforeach; else: ?>
-                              <tr><td colspan="7" class="text-center">No materials added</td></tr>
+                              <tr><td colspan="9" class="text-center">No materials added</td></tr>
                               <?php endif; ?>
                             </tbody>
                             <tfoot>
                               <tr>
-                                <th colspan="5" class="text-right">Total</th>
-                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php echo number_format($mat_total, 2); ?></th>
+                                <th colspan="7" class="text-right">Total</th>
+                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php
+                                  $mat_total = 0;
+                                  foreach ($proj_mats as $mat) {
+                                    $mat_total += ($mat['material_price'] + $mat['labor_other']) * $mat['quantity'];
+                                  }
+                                  echo number_format($mat_total, 2);
+                                ?></th>
                               </tr>
                             </tfoot>
                           </table>
@@ -520,7 +527,7 @@ if ($userid) {
                       <div class="card-header bg-success text-white d-flex align-items-center">
                         <span class="flex-grow-1">Project Equipments</span>
                         <?php if ($project['io'] == '1' || $project['io'] == '4'): ?>
-                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addEquipmentModal">Add Equipment</button>
+                        <button class="btn btn-light btn-sm ml-auto" data-bs-toggle="modal" data-bs-target="#addEquipmentModal"><i class="fas fa-truck-loading me-1"></i> Add Equipment</button>
                         <?php endif; ?>
                       </div>
                       <div class="card-body p-0">
@@ -533,17 +540,34 @@ if ($userid) {
                                 <th>Price</th>
                                 <th>Depreciation</th>
                                 <th>Category</th>
-                                <th>Days Used</th>
+                                <th>Project Days</th>
                                 <th>Total</th>
                                 <th>Action</th>
                               </tr>
                             </thead>
                             <tbody>
+                              <?php
+                                // Compute project days once (already computed above, reuse if possible)
+                                $start_date = $project['start_date'];
+                                $end_date = $project['deadline'];
+                                $start = new DateTime($start_date);
+                                $end = new DateTime($end_date);
+                                $interval = $start->diff($end);
+                                $project_days = $interval->days + 1;
+                              ?>
                               <?php if (count($proj_equipments) > 0): $i = 1; foreach ($proj_equipments as $eq): ?>
                               <tr>
                                 <td><?php echo $i++; ?></td>
                                 <td><?php echo htmlspecialchars($eq['equipment_name']); ?></td>
-                                <td><?php echo isset($eq['price']) ? number_format($eq['price'], 2) : '-'; ?></td>
+                                <td><?php
+                                    if (isset($eq['rental_fee']) && $eq['rental_fee'] !== null && $eq['rental_fee'] !== '' && $eq['rental_fee'] > 0) {
+                                      echo number_format($eq['rental_fee'], 2);
+                                    } elseif (isset($eq['price']) && $eq['price'] !== null && $eq['price'] !== '' && $eq['price'] > 0) {
+                                      echo number_format($eq['price'], 2);
+                                    } else {
+                                      echo '-';
+                                    }
+                                  ?></td>
                                 <td>
                                   <?php
                                     if (is_numeric($eq['depreciation'])) {
@@ -556,25 +580,52 @@ if ($userid) {
                                   ?>
                                 </td>
                                 <td><?php echo htmlspecialchars($eq['category']); ?></td>
+                                <td><?php echo $project_days; ?></td>
                                 <td>
-                                  <form method="post" style="display:inline-block;width:110px;">
-                                    <input type="hidden" name="row_id" value="<?php echo $eq['id']; ?>">
-                                    <input type="number" name="days_used" value="<?php echo $eq['days_used']; ?>" min="0" style="width:60px;display:inline-block;" <?php if ($project['io'] == '2') echo 'disabled'; ?>>
-                                    <button type="submit" name="update_project_equipment_days" class="btn btn-sm btn-primary" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Update</button>
-                                  </form>
+                                  <?php
+                                      if (isset($eq['category']) && (strtolower($eq['category']) == 'rental' || strtolower($eq['category']) == 'rent')) {
+                                          $rental_fee = isset($eq['rental_fee']) && $eq['rental_fee'] !== null && $eq['rental_fee'] !== '' ? floatval($eq['rental_fee']) : null;
+                                          
+                                          if ($rental_fee !== null) {
+                                              $total = $rental_fee * $project_days;
+                                          } else {
+                                              // fallback to depreciation if rental fee is missing
+                                              $price = isset($eq['price']) ? $eq['price'] : 0;
+                                              $depr = isset($eq['depreciation']) && is_numeric($eq['depreciation']) && $eq['depreciation'] > 0 ? $eq['depreciation'] : 0;
+                                              if ($depr > 0) {
+                                                  $depr_per_day = $price / ($depr * 365);
+                                                  $total = $depr_per_day * $project_days;
+                                              } else {
+                                                  $total = 0;
+                                              }
+                                          }
+                                      } else {
+                                          // non-rental, company-owned logic
+                                          $price = isset($eq['price']) ? $eq['price'] : 0;
+                                          $depr = isset($eq['depreciation']) && is_numeric($eq['depreciation']) && $eq['depreciation'] > 0 ? $eq['depreciation'] : 0;
+                                          if ($depr > 0) {
+                                              $depr_per_day = $price / ($depr * 365);
+                                              $total = $depr_per_day * $project_days;
+                                          } else {
+                                              $total = 0;
+                                          }
+                                      }
+
+                                    
+                                    echo number_format($total, 2);
+                                  ?>
                                 </td>
-                                <td><?php echo isset($eq['total']) ? number_format($eq['total'], 2) : ''; ?></td>
                                 <td>
                                   <?php if ($eq['status'] == 'In Use'): ?>
                                     <form method="post" style="display:inline;">
                                       <input type="hidden" name="report_equipment" value="1">
                                       <input type="hidden" name="report_row_id" value="<?php echo $eq['id']; ?>">
                                       <input type="hidden" name="report_remarks" value="Damage Equipment">
-                                      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Mark this equipment as damaged?')">Report Damage</button>
+                                      <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Mark this equipment as damaged?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>><i class="fas fa-exclamation-triangle"></i> Report Damage</button>
                                     </form>
                                     <form method="post" style="display:inline;">
                                       <input type="hidden" name="row_id" value="<?php echo $eq['id']; ?>">
-                                      <button type="submit" name="return_project_equipment" class="btn btn-sm btn-warning" onclick="return confirm('Mark this equipment as returned?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>>Return</button>
+                                      <button type="submit" name="return_project_equipment" class="btn btn-sm btn-warning" onclick="return confirm('Mark this equipment as returned?')" <?php if ($project['io'] == '2') echo 'disabled'; ?>><i class="fas fa-undo"></i> Return</button>
                                     </form>
                                   <?php else: ?>
                                     <span class="badge bg-success">Returned</span>
@@ -588,7 +639,25 @@ if ($userid) {
                             <tfoot>
                               <tr>
                                 <th colspan="6" class="text-right">Total</th>
-                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php echo number_format($equip_total, 2); ?></th>
+                                <th colspan="2" style="font-weight:bold;color:#222;">₱<?php
+                                  $equip_total = 0;
+                                  foreach ($proj_equipments as $eq) {
+                                    if (isset($eq['category']) && (strtolower($eq['category']) === 'rental' || strtolower($eq['category']) === 'rent')) {
+                                      $price = isset($eq['rental_fee']) ? $eq['rental_fee'] : 0;
+                                      $equip_total += $price * $project_days;
+                                    } else {
+                                      $price = isset($eq['price']) ? $eq['price'] : 0;
+                                      $depr = isset($eq['depreciation']) && is_numeric($eq['depreciation']) && $eq['depreciation'] > 0 ? $eq['depreciation'] : 0;
+                                      if ($depr > 0) {
+                                        $depr_per_day = $price / ($depr * 365);
+                                        $equip_total += $depr_per_day * $project_days;
+                                      } else {
+                                        $equip_total += 0;
+                                      }
+                                    }
+                                  }
+                                  echo number_format($equip_total, 2);
+                                ?></th>
                               </tr>
                             </tfoot>
                           </table>
@@ -686,14 +755,6 @@ if ($userid) {
           <div class="form-group">
             <label for="employeeRate">Daily Rate</label>
             <input type="text" class="form-control" id="employeeRate" name="employeeRate" readonly>
-          </div>
-          <div class="form-group">
-            <label for="employeeDays">Project Days (Total)</label>
-            <input type="number" class="form-control" id="employeeDays" name="employeeDays" min="1" value="1" required>
-          </div>
-          <div class="form-group">
-            <label for="employeeSchedule">Working Days (Minus Absences)</label>
-            <input type="number" class="form-control" id="employeeSchedule" name="employeeSchedule" min="1" value="1" required>
           </div>
           <div class="form-group">
             <label for="employeeTotal">Total</label>
@@ -873,12 +934,12 @@ if ($userid) {
   </div>
 </div>
 
-<!-- View Documents Modal -->
-<div class="modal fade" id="viewDocumentsModal" tabindex="-1" aria-labelledby="viewDocumentsModalLabel" aria-hidden="true">
+<!-- View Permits Modal -->
+<div class="modal fade" id="viewPermitsModal" tabindex="-1" aria-labelledby="viewPermitsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="viewDocumentsModalLabel">Project Permits & Clearances</h5>
+        <h5 class="modal-title" id="viewPermitsModalLabel">Project Permits & Clearances</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -886,8 +947,7 @@ if ($userid) {
           <div class="col-md-6 col-lg-3 text-center">
             <div class="mb-2 fw-bold">LGU Permit</div>
             <?php if (!empty($project['file_photo_lgu'])): ?>
-              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_lgu']); ?>" class="img-fluid rounded border mb-2" style="max-height:320px; max-width:100%;">
-              <a href="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_lgu']); ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">View Full</a>
+              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_lgu']); ?>" class="img-fluid rounded border mb-2 permit-thumb" style="width:200px; height:200px; object-fit:cover; cursor:pointer;" data-bs-toggle="modal" data-bs-target="#permitImageModal" data-img="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_lgu']); ?>">
             <?php else: ?>
               <div class="text-muted">Not uploaded</div>
             <?php endif; ?>
@@ -895,8 +955,7 @@ if ($userid) {
           <div class="col-md-6 col-lg-3 text-center">
             <div class="mb-2 fw-bold">Barangay Clearance</div>
             <?php if (!empty($project['file_photo_barangay'])): ?>
-              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_barangay']); ?>" class="img-fluid rounded border mb-2" style="max-height:320px; max-width:100%;">
-              <a href="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_barangay']); ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">View Full</a>
+              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_barangay']); ?>" class="img-fluid rounded border mb-2 permit-thumb" style="width:200px; height:200px; object-fit:cover; cursor:pointer;" data-bs-toggle="modal" data-bs-target="#permitImageModal" data-img="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_barangay']); ?>">
             <?php else: ?>
               <div class="text-muted">Not uploaded</div>
             <?php endif; ?>
@@ -904,8 +963,7 @@ if ($userid) {
           <div class="col-md-6 col-lg-3 text-center">
             <div class="mb-2 fw-bold">Fire Clearance</div>
             <?php if (!empty($project['file_photo_fire'])): ?>
-              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_fire']); ?>" class="img-fluid rounded border mb-2" style="max-height:320px; max-width:100%;">
-              <a href="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_fire']); ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">View Full</a>
+              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_fire']); ?>" class="img-fluid rounded border mb-2 permit-thumb" style="width:200px; height:200px; object-fit:cover; cursor:pointer;" data-bs-toggle="modal" data-bs-target="#permitImageModal" data-img="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_fire']); ?>">
             <?php else: ?>
               <div class="text-muted">Not uploaded</div>
             <?php endif; ?>
@@ -913,8 +971,7 @@ if ($userid) {
           <div class="col-md-6 col-lg-3 text-center">
             <div class="mb-2 fw-bold">Occupancy Permit</div>
             <?php if (!empty($project['file_photo_occupancy'])): ?>
-              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_occupancy']); ?>" class="img-fluid rounded border mb-2" style="max-height:320px; max-width:100%;">
-              <a href="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_occupancy']); ?>" target="_blank" class="btn btn-outline-primary btn-sm w-100">View Full</a>
+              <img src="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_occupancy']); ?>" class="img-fluid rounded border mb-2 permit-thumb" style="width:200px; height:200px; object-fit:cover; cursor:pointer;" data-bs-toggle="modal" data-bs-target="#permitImageModal" data-img="../uploads/project_files/<?php echo htmlspecialchars($project['file_photo_occupancy']); ?>">
             <?php else: ?>
               <div class="text-muted">Not uploaded</div>
             <?php endif; ?>
@@ -924,6 +981,29 @@ if ($userid) {
     </div>
   </div>
 </div>
+
+<!-- Permit Image Preview Modal -->
+<div class="modal fade" id="permitImageModal" tabindex="-1" aria-labelledby="permitImageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="permitImageModalLabel">Permit Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="permitImageModalImg" src="" alt="Permit Preview" style="max-width:100%; max-height:80vh; border-radius:8px;">
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.permit-thumb').forEach(function(img) {
+  img.addEventListener('click', function() {
+    var modalImg = document.getElementById('permitImageModalImg');
+    modalImg.src = this.getAttribute('data-img');
+  });
+});
+</script>
 
 <!-- Add a modal for reporting equipment -->
 <div class="modal fade" id="reportEquipmentModal" tabindex="-1" aria-labelledby="reportEquipmentModalLabel" aria-hidden="true">
@@ -984,13 +1064,12 @@ document.addEventListener('DOMContentLoaded', function() {
   var employeeContact = document.getElementById('employeeContact');
   var employeeRate = document.getElementById('employeeRate');
   var employeeDays = document.getElementById('employeeDays');
-  var employeeSchedule = document.getElementById('employeeSchedule');
   var employeeTotal = document.getElementById('employeeTotal');
 
   function updateEmployeeTotal() {
-    var schedule = parseFloat(employeeSchedule.value) || 0;
     var rate = parseFloat(employeeRate.value) || 0;
-    var total = schedule * rate;
+    var days = parseInt(employeeDays.value) || 0;
+    var total = rate * days;
     employeeTotal.value = total > 0 ? total.toFixed(2) : '';
   }
 
@@ -1004,13 +1083,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
   if (employeeDays) {
-    employeeDays.addEventListener('input', function() {
-      employeeSchedule.value = employeeDays.value;
-      updateEmployeeTotal();
-    });
-  }
-  if (employeeSchedule) {
-    employeeSchedule.addEventListener('input', updateEmployeeTotal);
+    employeeDays.addEventListener('input', updateEmployeeTotal);
   }
 
   // Material auto-fill and total
@@ -1228,7 +1301,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 <script>
-function showFeedbackModal(success, message) {
+function showFeedbackModal(success, message, error_code = '', query_param = '') {
   var icon = document.getElementById('feedbackIcon');
   var title = document.getElementById('feedbackTitle');
   var msg = document.getElementById('feedbackMessage');
@@ -1248,29 +1321,51 @@ function showFeedbackModal(success, message) {
 }
 (function() {
   var params = new URLSearchParams(window.location.search);
-  var left = params.get('left');
-  if (params.get('addmat') === '1') {
+  if (params.get('addemp') === '1') {
+    showFeedbackModal(true, 'Employee added successfully!');
+    // Remove the param after showing
+    params.delete('addemp');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
+  } else if (params.get('addmat') === '1') {
     showFeedbackModal(true, 'Material added successfully!');
+    params.delete('addmat');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('removemat') === '1') {
     showFeedbackModal(true, 'Material removed successfully!');
+    params.delete('removemat');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('returnmat') === '1') {
     showFeedbackModal(true, 'Material returned to inventory!');
+    params.delete('returnmat');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('addequip') === '1') {
     showFeedbackModal(true, 'Equipment added successfully!');
-  } else if (params.get('addemp') === '1') {
-    showFeedbackModal(true, 'Employee added successfully!');
+    params.delete('addequip');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('removeemp') === '1') {
     showFeedbackModal(true, 'Employee removed successfully!');
+    params.delete('removeemp');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('error') === 'material_exists') {
     showFeedbackModal(false, 'Material already added to this project!');
+    params.delete('error');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('error') === 'insufficient_stock') {
+    var left = params.get('left');
     var msg = 'Insufficient stock. Not enough material available.';
     if (left !== null) msg += ' Only ' + left + ' left.';
     showFeedbackModal(false, msg);
+    params.delete('error');
+    params.delete('left');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   } else if (params.get('error') === 'insufficient_slots') {
+    var left = params.get('left');
     var msg = 'Insufficient warehouse slots. Not enough space in the warehouse.';
     if (left !== null) msg += ' Only ' + left + ' slots left.';
     showFeedbackModal(false, msg);
+    params.delete('error');
+    params.delete('left');
+    window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? '?' + params.toString() : ''));
   }
 })();
 </script>
@@ -1281,6 +1376,245 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 <?php endif; ?>
+<script>
+// Set project_id for all forms in the modal when opening
+const uploadFilesModal = document.getElementById('uploadFilesModal');
+uploadFilesModal.addEventListener('show.bs.modal', function (event) {
+  const triggerBtn = event.relatedTarget;
+  let projectId = null;
+  if (triggerBtn && triggerBtn.getAttribute('data-project-id')) {
+    projectId = triggerBtn.getAttribute('data-project-id');
+  } else {
+    // fallback: try to get from a global or selection
+    projectId = document.getElementById('modal_project_id')?.value || '';
+  }
+  document.getElementById('modal_project_id_lgu').value = projectId;
+  document.getElementById('modal_project_id_barangay').value = projectId;
+  document.getElementById('modal_project_id_fire').value = projectId;
+  document.getElementById('modal_project_id_occupancy').value = projectId;
+});
+// Image preview for each file input
+const previewMap = {
+  'lgu': 'preview_file_photo_lgu',
+  'barangay': 'preview_file_photo_barangay',
+  'fire': 'preview_file_photo_fire',
+  'occupancy': 'preview_file_photo_occupancy'
+};
+document.querySelectorAll('.single-upload-form').forEach(function(form) {
+  const fileInput = form.querySelector('input[type="file"]');
+  const formId = form.getAttribute('action').replace('upload_', '').replace('.php', '');
+  const previewImg = document.getElementById('preview_file_photo_' + formId);
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files && fileInput.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewImg.src = e.target.result;
+        previewImg.classList.remove('d-none');
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else {
+      previewImg.classList.add('d-none');
+      previewImg.src = '';
+    }
+  });
+});
+</script>
+<?php if (isset($_GET['upload_success'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showFeedbackModal(true, 'Files uploaded successfully.', '', 'upload_success');
+});
+</script>
+<?php endif; ?>
+<?php if (isset($_GET['upload_error'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showFeedbackModal(false, 'Failed to upload files.', <?php echo json_encode(strip_tags($_GET['upload_error'])); ?>, 'upload_error');
+});
+</script>
+<?php endif; ?>
+<script>
+document.querySelectorAll('.single-upload-form').forEach(function(form) {
+  const fileInput = form.querySelector('input[type="file"]');
+  const invalidFeedback = fileInput.nextElementSibling; // the .invalid-feedback div
+
+  form.addEventListener('submit', function(e) {
+    if (!fileInput.files || !fileInput.files[0]) {
+      e.preventDefault();
+      fileInput.classList.add('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'block';
+      fileInput.focus();
+    } else {
+      fileInput.classList.remove('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'none';
+    }
+  });
+
+  // Hide error when user selects a file
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files && fileInput.files[0]) {
+      fileInput.classList.remove('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'none';
+    }
+  });
+});
+</script>
+
+<!-- Upload/Download Files Modal -->
+<div class="modal fade" id="uploadFilesModal" tabindex="-1" aria-labelledby="uploadFilesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="uploadFilesModalLabel">Upload Project Permits & Clearances</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info py-2 mb-3" style="font-size: 0.97rem;">
+          Upload images for the following required permits and clearances for this project:
+          <ul class="mb-0 ps-3">
+            <li>LGU Permit</li>
+            <li>Barangay Clearance</li>
+            <li>Fire Clearance</li>
+            <li>Occupancy Permit</li>
+          </ul>
+        </div>
+        <form class="mb-3 single-upload-form" method="POST" action="upload_lgu.php" enctype="multipart/form-data">
+          <input type="hidden" name="project_id" id="modal_project_id_lgu" value="<?php echo $project_id; ?>">
+          <img id="preview_file_photo_lgu" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
+          <label class="form-label">LGU Permit</label>
+          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
+          <div class="invalid-feedback">Please select a photo before uploading.</div>
+          <button type="submit" class="btn btn-success mt-2">Upload LGU Permit</button>
+        </form>
+        <form class="mb-3 single-upload-form" method="POST" action="upload_barangay.php" enctype="multipart/form-data">
+          <input type="hidden" name="project_id" id="modal_project_id_barangay" value="<?php echo $project_id; ?>">
+          <img id="preview_file_photo_barangay" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
+          <label class="form-label">Barangay Clearance</label>
+          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
+          <div class="invalid-feedback">Please select a photo before uploading.</div>
+          <button type="submit" class="btn btn-success mt-2">Upload Barangay Clearance</button>
+        </form>
+        <form class="mb-3 single-upload-form" method="POST" action="upload_fire.php" enctype="multipart/form-data">
+          <input type="hidden" name="project_id" id="modal_project_id_fire" value="<?php echo $project_id; ?>">
+          <img id="preview_file_photo_fire" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
+          <label class="form-label">Fire Clearance</label>
+          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
+          <div class="invalid-feedback">Please select a photo before uploading.</div>
+          <button type="submit" class="btn btn-success mt-2">Upload Fire Clearance</button>
+        </form>
+        <form class="mb-3 single-upload-form" method="POST" action="upload_occupancy.php" enctype="multipart/form-data">
+          <input type="hidden" name="project_id" id="modal_project_id_occupancy" value="<?php echo $project_id; ?>">
+          <img id="preview_file_photo_occupancy" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
+          <label class="form-label">Occupancy Permit</label>
+          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
+          <div class="invalid-feedback">Please select a photo before uploading.</div>
+          <button type="submit" class="btn btn-success mt-2">Upload Occupancy Permit</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// Set project_id for all forms in the modal when opening
+const uploadFilesModal = document.getElementById('uploadFilesModal');
+uploadFilesModal.addEventListener('show.bs.modal', function (event) {
+  const triggerBtn = event.relatedTarget;
+  let projectId = null;
+  if (triggerBtn && triggerBtn.getAttribute('data-project-id')) {
+    projectId = triggerBtn.getAttribute('data-project-id');
+  } else {
+    // fallback: try to get from a global or selection
+    projectId = document.getElementById('modal_project_id')?.value || '';
+  }
+  document.getElementById('modal_project_id_lgu').value = projectId;
+  document.getElementById('modal_project_id_barangay').value = projectId;
+  document.getElementById('modal_project_id_fire').value = projectId;
+  document.getElementById('modal_project_id_occupancy').value = projectId;
+});
+// Image preview for each file input
+const previewMap = {
+  'lgu': 'preview_file_photo_lgu',
+  'barangay': 'preview_file_photo_barangay',
+  'fire': 'preview_file_photo_fire',
+  'occupancy': 'preview_file_photo_occupancy'
+};
+document.querySelectorAll('.single-upload-form').forEach(function(form) {
+  const fileInput = form.querySelector('input[type="file"]');
+  const formId = form.getAttribute('action').replace('upload_', '').replace('.php', '');
+  const previewImg = document.getElementById('preview_file_photo_' + formId);
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files && fileInput.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewImg.src = e.target.result;
+        previewImg.classList.remove('d-none');
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else {
+      previewImg.classList.add('d-none');
+      previewImg.src = '';
+    }
+  });
+});
+</script>
+
+<?php if (isset($_GET['upload_success'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showFeedbackModal(true, 'Files uploaded successfully.', '', 'upload_success');
+});
+</script>
+<?php endif; ?>
+<?php if (isset($_GET['upload_error'])): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    showFeedbackModal(false, 'Failed to upload files.', <?php echo json_encode(strip_tags($_GET['upload_error'])); ?>, 'upload_error');
+});
+</script>
+<?php endif; ?>
+
+<!-- Add JS for client-side validation of file input before upload -->
+<script>
+document.querySelectorAll('.single-upload-form').forEach(function(form) {
+  const fileInput = form.querySelector('input[type="file"]');
+  const invalidFeedback = fileInput.nextElementSibling; // the .invalid-feedback div
+
+  form.addEventListener('submit', function(e) {
+    if (!fileInput.files || !fileInput.files[0]) {
+      e.preventDefault();
+      fileInput.classList.add('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'block';
+      fileInput.focus();
+    } else {
+      fileInput.classList.remove('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'none';
+    }
+  });
+
+  // Hide error when user selects a file
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files && fileInput.files[0]) {
+      fileInput.classList.remove('is-invalid');
+      if (invalidFeedback) invalidFeedback.style.display = 'none';
+    }
+  });
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.location.search.includes('upload_success=1')) {
+    setTimeout(function() {
+      // Close the modal if open
+      var modal = bootstrap.Modal.getInstance(document.getElementById('feedbackModal'));
+      if (modal) modal.hide();
+      // Refresh the page and remove the query param
+      var url = new URL(window.location.href);
+      url.searchParams.delete('upload_success');
+      window.location.href = url.pathname + url.search;
+    }, 1500);
+  }
+});
+</script>
 </body>
 
 </html>

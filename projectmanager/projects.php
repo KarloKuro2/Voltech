@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_project'])) {
                 $position = mysqli_real_escape_string($con, $frow['position_title']);
                 $daily_rate = floatval($frow['daily_rate']);
                 // Insert into project_add_employee
-                mysqli_query($con, "INSERT INTO project_add_employee (project_id, employee_id, position, daily_rate, days, schedule, total) VALUES ('$new_project_id', '$foreman_id', '$position', '$daily_rate', 0, 0, 0)");
+                mysqli_query($con, "INSERT INTO project_add_employee (project_id, employee_id, position, daily_rate, total) VALUES ('$new_project_id', '$foreman_id', '$position', '$daily_rate', 0)");
             }
         }
 
@@ -266,7 +266,13 @@ if ($userid) {
                                   <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                       <h4 class="mb-0">List of Projects</h4>
-                                      <a href="project_archived.php" class="btn btn-danger ms-2">View Archived Projects</a>
+                                      <div class="d-flex align-items-center gap-2">
+                                        <a href="gantt.php" class="btn btn-primary"><i class="fas fa-chart-bar me-1"></i> Gantt Chart</a>
+                                        <a href="project_archived.php" class="btn btn-danger"><i class="fas fa-archive me-1"></i> Archives</a>
+                                        <button class="btn btn-success" style="width:180px;" data-bs-toggle="modal" data-bs-target="#AddProjectModal">
+                                          <i class="fas fa-plus"></i> New Project
+                                        </button>
+                                      </div>
                                     </div>
                                     <hr>
                                     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
@@ -293,12 +299,7 @@ if ($userid) {
                                           </div>
                                         </form>
                                         <div class="ms-auto" style="flex:0 0 auto;text-align:right;">
-                                          <a href="gantt.php" class="btn btn-outline-primary me-2" style="width: 180px;">
-                                            <i class="fas fa-project-diagram"></i> Show Gantt Chart
-                                          </a>
-                                          <button class="btn btn-success" style="width:180px;" data-bs-toggle="modal" data-bs-target="#AddProjectModal">
-                                            <i class="fas fa-plus"></i> New Project
-                                          </button>
+                                          <!-- Removed Gantt Chart button from here -->
                                       </div>
                                   </div>
                               </div>
@@ -364,12 +365,6 @@ if ($userid) {
                                                     <a href="project_details.php?id=<?php echo $id; ?>" class="btn btn-sm btn-primary text-white font-weight-bold mr-2">
                                                         <i fas fa eye></i> View More
                                                     </a>
-                                                    <button class="btn btn-sm btn-secondary text-white font-weight-bold upload-files-btn mx-1"
-                                                            data-project-id="<?php echo $id; ?>"
-                                                            data-bs-toggle="modal"
-                                                            data-bs-target="#uploadFilesModal">
-                                                        <i class="fas fa-upload"></i> Files
-                                                    </button>
                                                     <button class="btn btn-sm btn-danger text-white font-weight-bold archive-project" data-project-id="<?php echo $id; ?>">
                                                         <i fas fa trash "></i> Archive
                                                     </button>
@@ -849,147 +844,6 @@ document.addEventListener('DOMContentLoaded', function() {
       xhr.send(formData);
     });
   }
-});
-</script>
-
-<!-- Upload/Download Files Modal -->
-<div class="modal fade" id="uploadFilesModal" tabindex="-1" aria-labelledby="uploadFilesModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="uploadFilesModalLabel">Upload Project Permits & Clearances</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert alert-info py-2 mb-3" style="font-size: 0.97rem;">
-          Upload images for the following required permits and clearances for this project:
-          <ul class="mb-0 ps-3">
-            <li>LGU Permit</li>
-            <li>Barangay Clearance</li>
-            <li>Fire Clearance</li>
-            <li>Occupancy Permit</li>
-          </ul>
-        </div>
-        <form class="mb-3 single-upload-form" method="POST" action="upload_lgu.php" enctype="multipart/form-data">
-          <input type="hidden" name="project_id" id="modal_project_id_lgu">
-          <img id="preview_file_photo_lgu" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
-          <label class="form-label">LGU Permit</label>
-          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
-          <div class="invalid-feedback">Please select a photo before uploading.</div>
-          <button type="submit" class="btn btn-success mt-2">Upload LGU Permit</button>
-        </form>
-        <form class="mb-3 single-upload-form" method="POST" action="upload_barangay.php" enctype="multipart/form-data">
-          <input type="hidden" name="project_id" id="modal_project_id_barangay">
-          <img id="preview_file_photo_barangay" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
-          <label class="form-label">Barangay Clearance</label>
-          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
-          <div class="invalid-feedback">Please select a photo before uploading.</div>
-          <button type="submit" class="btn btn-success mt-2">Upload Barangay Clearance</button>
-        </form>
-        <form class="mb-3 single-upload-form" method="POST" action="upload_fire.php" enctype="multipart/form-data">
-          <input type="hidden" name="project_id" id="modal_project_id_fire">
-          <img id="preview_file_photo_fire" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
-          <label class="form-label">Fire Clearance</label>
-          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
-          <div class="invalid-feedback">Please select a photo before uploading.</div>
-          <button type="submit" class="btn btn-success mt-2">Upload Fire Clearance</button>
-        </form>
-        <form class="mb-3 single-upload-form" method="POST" action="upload_occupancy.php" enctype="multipart/form-data">
-          <input type="hidden" name="project_id" id="modal_project_id_occupancy">
-          <img id="preview_file_photo_occupancy" class="img-thumbnail mb-2 d-none" style="max-width: 220px; max-height: 220px; display:block; margin:auto;" />
-          <label class="form-label">Occupancy Permit</label>
-          <input type="file" class="form-control file-input-preview" name="file_photo" accept="image/*">
-          <div class="invalid-feedback">Please select a photo before uploading.</div>
-          <button type="submit" class="btn btn-success mt-2">Upload Occupancy Permit</button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-<script>
-// Set project_id for all forms in the modal when opening
-const uploadFilesModal = document.getElementById('uploadFilesModal');
-uploadFilesModal.addEventListener('show.bs.modal', function (event) {
-  const triggerBtn = event.relatedTarget;
-  let projectId = null;
-  if (triggerBtn && triggerBtn.getAttribute('data-project-id')) {
-    projectId = triggerBtn.getAttribute('data-project-id');
-  } else {
-    // fallback: try to get from a global or selection
-    projectId = document.getElementById('modal_project_id')?.value || '';
-  }
-  document.getElementById('modal_project_id_lgu').value = projectId;
-  document.getElementById('modal_project_id_barangay').value = projectId;
-  document.getElementById('modal_project_id_fire').value = projectId;
-  document.getElementById('modal_project_id_occupancy').value = projectId;
-});
-// Image preview for each file input
-const previewMap = {
-  'lgu': 'preview_file_photo_lgu',
-  'barangay': 'preview_file_photo_barangay',
-  'fire': 'preview_file_photo_fire',
-  'occupancy': 'preview_file_photo_occupancy'
-};
-document.querySelectorAll('.single-upload-form').forEach(function(form) {
-  const fileInput = form.querySelector('input[type="file"]');
-  const formId = form.getAttribute('action').replace('upload_', '').replace('.php', '');
-  const previewImg = document.getElementById('preview_file_photo_' + formId);
-  fileInput.addEventListener('change', function() {
-    if (fileInput.files && fileInput.files[0]) {
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        previewImg.src = e.target.result;
-        previewImg.classList.remove('d-none');
-      };
-      reader.readAsDataURL(fileInput.files[0]);
-    } else {
-      previewImg.classList.add('d-none');
-      previewImg.src = '';
-    }
-  });
-});
-</script>
-
-<?php if (isset($_GET['upload_success'])): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    showFeedbackModal(true, 'Files uploaded successfully.', '', 'upload_success');
-});
-</script>
-<?php endif; ?>
-<?php if (isset($_GET['upload_error'])): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    showFeedbackModal(false, 'Failed to upload files.', <?php echo json_encode(strip_tags($_GET['upload_error'])); ?>, 'upload_error');
-});
-</script>
-<?php endif; ?>
-
-<!-- Add JS for client-side validation of file input before upload -->
-<script>
-document.querySelectorAll('.single-upload-form').forEach(function(form) {
-  const fileInput = form.querySelector('input[type="file"]');
-  const invalidFeedback = fileInput.nextElementSibling; // the .invalid-feedback div
-
-  form.addEventListener('submit', function(e) {
-    if (!fileInput.files || !fileInput.files[0]) {
-      e.preventDefault();
-      fileInput.classList.add('is-invalid');
-      if (invalidFeedback) invalidFeedback.style.display = 'block';
-      fileInput.focus();
-    } else {
-      fileInput.classList.remove('is-invalid');
-      if (invalidFeedback) invalidFeedback.style.display = 'none';
-    }
-  });
-
-  // Hide error when user selects a file
-  fileInput.addEventListener('change', function() {
-    if (fileInput.files && fileInput.files[0]) {
-      fileInput.classList.remove('is-invalid');
-      if (invalidFeedback) invalidFeedback.style.display = 'none';
-    }
-  });
 });
 </script>
 

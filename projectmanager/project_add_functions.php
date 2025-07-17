@@ -43,11 +43,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_project_employee'
     $employee_id = intval($_POST['employeeName']);
     $position = mysqli_real_escape_string($con, $_POST['employeePosition']);
     $daily_rate = floatval($_POST['employeeRate']);
-    $days = intval($_POST['employeeDays']);
-    $schedule = intval($_POST['employeeSchedule']);
-    $total = $daily_rate * $schedule;
     $project_id = intval($_GET['id']);
-    $sql = "INSERT INTO project_add_employee (project_id, employee_id, position, daily_rate, days, schedule, total) VALUES ('$project_id', '$employee_id', '$position', '$daily_rate', '$days', '$schedule', '$total')";
+    // Get project start_date and deadline
+    $proj_res = mysqli_query($con, "SELECT start_date, deadline FROM projects WHERE project_id='$project_id' LIMIT 1");
+    $proj_row = mysqli_fetch_assoc($proj_res);
+    $start_date = $proj_row['start_date'];
+    $end_date = $proj_row['deadline'];
+    $start = new DateTime($start_date);
+    $end = new DateTime($end_date);
+    $interval = $start->diff($end);
+    $project_days = $interval->days + 1;
+    $total = $daily_rate * $project_days;
+    $sql = "INSERT INTO project_add_employee (project_id, employee_id, position, daily_rate, total) VALUES ('$project_id', '$employee_id', '$position', '$daily_rate', '$total')";
     mysqli_query($con, $sql);
     header("Location: project_details.php?id=$project_id&addemp=1");
     exit();

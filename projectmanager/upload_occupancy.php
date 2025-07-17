@@ -18,10 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['project_id'])) {
             if (move_uploaded_file($_FILES[$input_name]['tmp_name'], $target_file)) {
                 $sql = "UPDATE projects SET file_photo_occupancy = '$filename' WHERE project_id = '$project_id'";
                 if ($con->query($sql)) {
-                    header('Location: projects.php?upload_success=1');
+                    header('Location: project_details.php?id=' . $project_id . '&upload_success=1');
                     exit();
                 } else {
-                    header('Location: projects.php?upload_error=' . urlencode('DB Error: ' . $con->error));
+                    header('Location: project_details.php?id=' . $project_id . '&upload_error=' . urlencode('DB Error: ' . $con->error));
                     exit();
                 }
             } else {
