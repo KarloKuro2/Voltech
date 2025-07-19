@@ -112,7 +112,7 @@ $suppliers = $con->query($suppliers_query);
 // Add these after $con = new mysqli(...);
 $all_suppliers = $con->query("SELECT id, supplier_name FROM suppliers WHERE approval = 'Approved' ORDER BY supplier_name");
 $all_warehouses = $con->query("SELECT id, warehouse FROM warehouses WHERE approval = 'Approved' ORDER BY warehouse");
-$all_categories = $con->query("SELECT DISTINCT category FROM warehouses WHERE approval = 'Approved' ORDER BY category");
+$all_categories = $con->query("SELECT material_category FROM materials_category ORDER BY material_category");
 
 // Fetch materials from database with pagination and filters
 $sql = "SELECT * FROM materials $where_clause";
@@ -467,9 +467,13 @@ function short_number_format($num, $precision = 1) {
                                                                        value="<?php echo $row['material_price']; ?>" required>
                                                             </div>
                                                             <div class="form-group">
-                                                                <label>Labor/Other Cost</label>
-                                                                <input type="number" step="0.01" class="form-control" name="labor_other" 
+                                                                <label>Other Cost</label>
+                                                                <input type="number" step="0.01" class="form-control labor-other-edit" name="labor_other" 
                                                                        value="<?php echo $row['labor_other']; ?>">
+                                                            </div>
+                                                            <div class="form-group">
+                                                                <label>Amount</label>
+                                                                <input type="number" step="0.01" class="form-control amount-sum-edit" name="amount_sum" value="<?php echo ($row['material_price'] || $row['labor_other']) ? number_format($row['material_price'] + $row['labor_other'], 2, '.', '') : ''; ?>" readonly>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -531,7 +535,7 @@ function short_number_format($num, $precision = 1) {
                   <div class="form-group mb-3">
                     <label>Supplier</label>
                     <select class="form-control" name="supplier_name" required>
-                      <option value="">Select Supplier</option>
+                      <option value="" disabled selected>Select Supplier</option>
                       <?php if ($all_suppliers) { while($sup = $all_suppliers->fetch_assoc()): ?>
                         <option value="<?php echo htmlspecialchars($sup['supplier_name']); ?>">
                           <?php echo htmlspecialchars($sup['supplier_name']); ?>
@@ -542,7 +546,7 @@ function short_number_format($num, $precision = 1) {
                   <div class="form-group mb-3">
                     <label>Location</label>
                     <select class="form-control" name="location">
-                      <option value="">Select Location</option>
+                      <option value="" disabled selected>Select Location</option>
                       <?php if ($all_warehouses) { while($wh = $all_warehouses->fetch_assoc()): ?>
                         <option value="<?php echo htmlspecialchars($wh['warehouse']); ?>">
                           <?php echo htmlspecialchars($wh['warehouse']); ?>
@@ -553,10 +557,10 @@ function short_number_format($num, $precision = 1) {
                   <div class="form-group mb-3">
                     <label>Category</label>
                     <select class="form-control" name="category" required>
-                      <option value="">Select Category</option>
+                      <option value="" disabled selected>Select Category</option>
                       <?php if ($all_categories) { while($cat = $all_categories->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($cat['category']); ?>">
-                          <?php echo htmlspecialchars($cat['category']); ?>
+                        <option value="<?php echo htmlspecialchars($cat['material_category']); ?>">
+                          <?php echo htmlspecialchars($cat['material_category']); ?>
                         </option>
                       <?php endwhile; } ?>
                     </select>
@@ -572,7 +576,14 @@ function short_number_format($num, $precision = 1) {
                       <div class="form-group mb-3">
                         <label>Unit</label>
                         <select class="form-control" name="unit" required>
-                          <option value="">Select Unit</option>
+                          <option value="" disabled selected>Select Unit</option>
+                          
+                          <option value="Set">Set</option>
+                          <option value="Sets">Sets</option>
+                          <option value="Mts">Mts</option>
+                          <option value="Lgts">Lgts</option>
+                          <option value="Pcs">Pcs</option>
+                          <option value="Lot">Lot</option>
                           <option value="kg">kg</option>
                           <option value="g">g</option>
                           <option value="t">t</option>
@@ -608,9 +619,10 @@ function short_number_format($num, $precision = 1) {
                     <input type="number" step="0.01" class="form-control" name="material_price" required>
                   </div>
                   <div class="form-group mb-3">
-                    <label>Labor/Other Cost</label>
-                    <input type="number" step="0.01" class="form-control" name="labor_other">
+                    <label>Other Cost</label>
+                    <input type="number" step="0.01" class="form-control" name="labor_other" id="labor_other">
                   </div>
+                  
                 </div>
               </div>
             </div>
@@ -707,6 +719,51 @@ function short_number_format($num, $precision = 1) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="po_materials.js"></script>
+    <script>
+    // Live update Amount field in Edit Material modal as sum of Material Price and Other Cost
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('[id^="editModal"]').forEach(function(modal) {
+        modal.addEventListener('shown.bs.modal', function() {
+          var priceInput = modal.querySelector('input[name="material_price"]');
+          var otherInput = modal.querySelector('input[name="labor_other"]');
+          var amountInput = modal.querySelector('input.amount-sum-edit');
+          function updateAmount() {
+            var price = priceInput.value.trim() === '' ? '' : parseFloat(priceInput.value) || 0;
+            var other = otherInput.value.trim() === '' ? '' : parseFloat(otherInput.value) || 0;
+            if (price === '' && other === '') {
+              amountInput.value = '';
+            } else {
+              amountInput.value = ((price || 0) + (other || 0)).toFixed(2);
+            }
+          }
+          if (priceInput && otherInput && amountInput) {
+            priceInput.addEventListener('input', updateAmount);
+            otherInput.addEventListener('input', updateAmount);
+            updateAmount();
+          }
+        });
+      });
+    });
+    </script>
+    <script>
+    // Live update Amount field as sum of Material Price and Other Cost
+    document.addEventListener('DOMContentLoaded', function() {
+      var priceInput = document.querySelector('input[name="material_price"]');
+      var otherInput = document.querySelector('input[name="labor_other"]');
+      var amountInput = document.getElementById('amount_sum');
+      function updateAmount() {
+        var price = parseFloat(priceInput.value) || 0;
+        var other = parseFloat(otherInput.value) || 0;
+        amountInput.value = (price + other).toFixed(2);
+      }
+      if (priceInput && otherInput && amountInput) {
+        priceInput.addEventListener('input', updateAmount);
+        otherInput.addEventListener('input', updateAmount);
+        // Initialize on load
+        updateAmount();
+      }
+    });
+    </script>
     <script>
     function showFeedbackModal(success, message, details, action) {
         var icon = document.getElementById('feedbackIcon');

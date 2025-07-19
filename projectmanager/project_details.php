@@ -147,7 +147,7 @@ while ($row = mysqli_fetch_assoc($units_result)) {
     $units[] = $row['unit'];
 }
 // Fetch employees for dropdown (for this user, exclude Foreman)
-$employees_result = mysqli_query($con, "SELECT e.employee_id, e.first_name, e.last_name, e.contact_number, p.title as position_title, p.daily_rate FROM employees e LEFT JOIN positions p ON e.position_id = p.position_id WHERE e.user_id='$userid' AND LOWER(p.title) != 'foreman' ORDER BY e.last_name, e.first_name");
+$employees_result = mysqli_query($con, "SELECT e.employee_id, e.first_name, e.last_name, e.contact_number, p.title as position_title, p.daily_rate FROM employees e LEFT JOIN positions p ON e.position_id = p.position_id WHERE e.user_id='$userid' ORDER BY e.last_name, e.first_name");
 $employees = [];
 while ($row = mysqli_fetch_assoc($employees_result)) {
     $employees[] = $row;
@@ -782,15 +782,34 @@ if ($userid) {
         <div class="modal-body">
           <input type="hidden" name="add_project_material" value="1">
           <div class="form-group">
+            <!-- Category Dropdown -->
+            <label for="materialCategory">Category</label>
+            <select class="form-control mb-2" id="materialCategory" name="materialCategory">
+              <option value="" disabled selected>Select Category</option>
+              <?php
+                $categories = array();
+                foreach ($materials as $mat) {
+                  if (!empty($mat['category']) && (int)$mat['quantity'] > 0) {
+                    $categories[$mat['category']] = true;
+                  }
+                }
+                foreach (array_keys($categories) as $cat): ?>
+                  <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+              <?php endforeach; ?>
+            </select>
+            <!-- Material Name Dropdown -->
             <label for="materialName">Material Name</label>
             <select class="form-control" id="materialName" name="materialName" required>
               <option value="" disabled selected>Select Material</option>
               <?php foreach ($materials as $mat): ?>
                 <option value="<?php echo htmlspecialchars($mat['id']); ?>"
+                  data-category="<?php echo htmlspecialchars($mat['category']); ?>"
                   data-unit="<?php echo htmlspecialchars($mat['unit']); ?>"
                   data-price="<?php echo htmlspecialchars($mat['material_price']); ?>"
                   data-name="<?php echo htmlspecialchars($mat['material_name']); ?>"
-                ><?php echo htmlspecialchars($mat['material_name']); ?></option>
+                  data-qty="<?php echo isset($mat['quantity']) ? (int)$mat['quantity'] : 0; ?>"
+                  <?php echo (isset($mat['quantity']) && (int)$mat['quantity'] === 0) ? 'disabled style="color:#aaa;"' : ''; ?>
+                ><?php echo htmlspecialchars($mat['material_name']); ?><?php if(isset($mat['quantity']) && (int)$mat['quantity'] === 0) echo ' (Out of Stock)'; ?></option>
               <?php endforeach; ?>
             </select>
             <input type="hidden" id="materialNameText" name="materialNameText">
@@ -798,6 +817,10 @@ if ($userid) {
           <div class="form-group">
             <label for="materialQty">Quantity</label>
             <input type="number" class="form-control" id="materialQty" name="materialQty" required>
+          </div>
+          <div class="form-group">
+            <label for="materialQtyLeft">Remaining Quantity</label>
+            <input type="text" class="form-control" id="materialQtyLeft" name="materialQtyLeft" readonly>
           </div>
           <div class="form-group">
             <label for="materialUnit">Unit</label>
@@ -1058,6 +1081,55 @@ $(document).on('click', '.report-btn', function() {
     </script>
     <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Filter Material Name dropdown by selected category
+  var materialCategory = document.getElementById('materialCategory');
+  var materialNameSelect = document.getElementById('materialName');
+  var allMaterialOptions = [];
+  if (materialNameSelect) {
+    for (var i = 0; i < materialNameSelect.options.length; i++) {
+      var opt = materialNameSelect.options[i];
+      if (opt.value) {
+        allMaterialOptions.push({
+          value: opt.value,
+          text: opt.text,
+          category: opt.getAttribute('data-category'),
+          unit: opt.getAttribute('data-unit'),
+          price: opt.getAttribute('data-price'),
+          name: opt.getAttribute('data-name'),
+          qty: opt.getAttribute('data-qty'),
+          disabled: opt.disabled
+        });
+      }
+    }
+  }
+
+  if (materialCategory && materialNameSelect) {
+    materialCategory.addEventListener('change', function() {
+      var selectedCat = materialCategory.value;
+      // Remove all except the placeholder
+      materialNameSelect.innerHTML = '<option value="" disabled selected>Select Material</option>';
+      allMaterialOptions.forEach(function(opt) {
+        if (opt.category === selectedCat && opt.qty > 0) {
+          var o = document.createElement('option');
+          o.value = opt.value;
+          o.textContent = opt.text;
+          o.setAttribute('data-category', opt.category);
+          o.setAttribute('data-unit', opt.unit);
+          o.setAttribute('data-price', opt.price);
+          o.setAttribute('data-name', opt.name);
+          o.setAttribute('data-qty', opt.qty);
+          materialNameSelect.appendChild(o);
+        }
+      });
+      // Reset dependent fields
+      if (materialUnit) materialUnit.value = '';
+      if (materialPrice) materialPrice.value = '';
+      if (materialNameText) materialNameText.value = '';
+      if (materialQtyLeft) materialQtyLeft.value = '';
+      if (materialQty) materialQty.value = '';
+      if (materialTotal) materialTotal.value = '';
+    });
+  }
   // Employee auto-fill and total
   var employeeName = document.getElementById('employeeName');
   var employeePosition = document.getElementById('employeePosition');
@@ -1093,6 +1165,13 @@ document.addEventListener('DOMContentLoaded', function() {
   var materialNameText = document.getElementById('materialNameText');
   var materialQty = document.getElementById('materialQty');
   var materialTotal = document.getElementById('materialTotal');
+  var materialQtyLeft = document.getElementById('materialQtyLeft');
+
+  // Build a map of material id to quantity
+  var materialQtyMap = {};
+  <?php foreach ($materials as $mat): ?>
+    materialQtyMap['<?php echo $mat['id']; ?>'] = <?php echo isset($mat['quantity']) ? (int)$mat['quantity'] : 0; ?>;
+  <?php endforeach; ?>
 
   function updateMaterialTotal() {
     var qty = parseFloat(materialQty.value) || 0;
@@ -1107,6 +1186,12 @@ document.addEventListener('DOMContentLoaded', function() {
       materialUnit.value = selected.getAttribute('data-unit') || '';
       materialPrice.value = selected.getAttribute('data-price') || '';
       materialNameText.value = selected.getAttribute('data-name') || '';
+      // Show remaining quantity in its own field
+      var matId = selected.value;
+      if (materialQtyLeft) {
+        var qty = materialQtyMap[matId] !== undefined ? materialQtyMap[matId] : '';
+        materialQtyLeft.value = qty !== '' ? qty : '';
+      }
       updateMaterialTotal();
     });
   }

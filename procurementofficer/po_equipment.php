@@ -343,15 +343,16 @@ $result = $con->query($sql);
                 <!-- Equipment Tabs -->
                 <ul class="nav nav-tabs mb-4" id="equipmentTabs" role="tablist">
                   <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests" type="button" role="tab" aria-controls="requests" aria-selected="true">Requests</button>
+                    <button class="nav-link active" id="equipment-list-tab" data-bs-toggle="tab" data-bs-target="#equipment-list" type="button" role="tab" aria-controls="equipment-list" aria-selected="true">Equipment List</button>
                   </li>
                   <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="equipment-list-tab" data-bs-toggle="tab" data-bs-target="#equipment-list" type="button" role="tab" aria-controls="equipment-list" aria-selected="false">Equipment List</button>
+                    <button class="nav-link" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests" type="button" role="tab" aria-controls="requests" aria-selected="false">Requests</button>
                   </li>
+
                 </ul>
                 <div class="tab-content" id="equipmentTabsContent">
                   <!-- Requests Tab -->
-                  <div class="tab-pane fade show active" id="requests" role="tabpanel" aria-labelledby="requests-tab">
+                  <div class="tab-pane fade" id="requests" role="tabpanel" aria-labelledby="requests-tab">
                     <div class="card mb-5 shadow rounded-3">
                       <div class="card-body">
                         <h4 class="mb-3">Equipment Requests</h4>
@@ -394,7 +395,7 @@ $result = $con->query($sql);
                     </div>
                   </div>
                   <!-- Equipment List Tab -->
-                  <div class="tab-pane fade" id="equipment-list" role="tabpanel" aria-labelledby="equipment-list-tab">
+                  <div class="tab-pane fade show active" id="equipment-list" role="tabpanel" aria-labelledby="equipment-list-tab">
                     <div class="card mb-5 shadow rounded-3">
                         <div class="card-body">
                             <div class="mb-3 d-flex flex-wrap gap-2 justify-content-between align-items-center">
